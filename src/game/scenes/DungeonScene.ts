@@ -4,8 +4,11 @@ import { storageService } from '../../services/storageService';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'spawn' | 'battle' | 'treasure' | 'elite' | 'supply' | 'boss';
-type GameFlowState = 'title' | 'playing' | 'paused' | 'ended';
+type GameFlowState = 'title' | 'playing' | 'paused' | 'reward' | 'ended';
 type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'dead';
+type RewardRarity = 'common' | 'rare' | 'epic';
+type RewardType = '攻击' | '生存' | '回复' | '技能';
+type RewardTrigger = 'battle' | 'treasure' | 'elite';
 type SoundName =
   | 'swing'
   | 'hit'
@@ -52,6 +55,31 @@ interface RoomDef {
   reward?: 'chest' | 'potion';
 }
 
+interface RewardOption {
+  id: string;
+  name: string;
+  rarity: RewardRarity;
+  type: RewardType;
+  description: string;
+  effectText: string;
+  stackable?: boolean;
+  apply: (scene: DungeonScene) => void;
+}
+
+interface PlayerRelicState {
+  moveSpeedMultiplier: number;
+  dashDamageMultiplier: number;
+  dashDistanceMultiplier: number;
+  bonusDamage: number;
+  potionHealBonus: number;
+  cooldownReduction: number;
+  relics: RewardOption[];
+  temporaryShield: number;
+  damageReductionFromMinions: number;
+  bossRoomHealUsed: boolean;
+  dashCooldownRefunded: boolean;
+}
+
 const ROOMS: RoomDef[] = [
   { id: 'room-1', name: '出生房', kind: 'spawn', description: '灵墟入口，空气里漂浮着发光的晶尘。', enemies: [] },
   { id: 'room-2', name: '普通战斗房', kind: 'battle', description: '晶化史莱姆与骷髅守卫堵住了通道。', enemies: ['slime', 'skeleton'] },
@@ -68,6 +96,28 @@ const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = 
   archer: { name: '符文射手', kind: 'archer', hp: 35, maxHp: 35, atk: 10, def: 1, speed: 70, range: 230, cooldown: 1450, ranged: true },
   boss: { name: '晶核守卫', kind: 'boss', hp: 220, maxHp: 220, atk: 12, def: 3, speed: 62, range: 62, cooldown: 1100, boss: true }
 };
+
+const REWARD_POOL: RewardOption[] = [
+  { id: 'sharp-blade', name: '锋利剑刃', rarity: 'common', type: '攻击', description: '剑刃重新开锋，普通攻击与冲刺斩基础伤害提高。', effectText: 'ATK +2', apply: (scene) => { scene.player.stats.atk += 2; } },
+  { id: 'attack-crystal', name: '攻击晶石', rarity: 'rare', type: '攻击', description: '源晶强化武器核心，但出现频率较低。', effectText: 'ATK +3', apply: (scene) => { scene.player.stats.atk += 3; } },
+  { id: 'armor-rune', name: '破甲符文', rarity: 'rare', type: '攻击', description: '普通攻击和冲刺斩额外造成固定伤害。', effectText: '普攻 / 冲刺斩伤害 +2', apply: (scene) => { scene.relicState.bonusDamage += 2; } },
+  { id: 'source-dagger', name: '源晶短刃', rarity: 'epic', type: '攻击', description: '冲刺斩获得源晶刃影加成，不影响普通攻击。', effectText: '冲刺斩伤害 +25%', apply: (scene) => { scene.relicState.dashDamageMultiplier += 0.25; } },
+
+  { id: 'defense-charm', name: '防御护符', rarity: 'common', type: '生存', description: '稳定的护符让正面承伤更可靠。', effectText: 'DEF +1', apply: (scene) => { scene.player.stats.def += 1; } },
+  { id: 'life-crystal', name: '生命结晶', rarity: 'rare', type: '生存', description: '提升最大生命，并立即回复同等生命。', effectText: 'MaxHP +15，回复 15 HP', apply: (scene) => { scene.player.stats.maxHp += 15; scene.player.stats.hp = Math.min(scene.player.stats.maxHp, scene.player.stats.hp + 15); } },
+  { id: 'crystal-shield', name: '晶体护盾', rarity: 'rare', type: '生存', description: '进入新房间时生成一层独立临时护盾。', effectText: '每个新房间获得 Shield 10', apply: () => undefined },
+  { id: 'source-plate', name: '源晶甲片', rarity: 'epic', type: '生存', description: '源晶甲片削弱普通怪造成的伤害。', effectText: '普通怪伤害 -15%', apply: (scene) => { scene.relicState.damageReductionFromMinions += 0.15; } },
+
+  { id: 'small-potion', name: '小型生命药水', rarity: 'common', type: '回复', description: '立即饮用的应急药剂。', effectText: '立即回复 25 HP', stackable: true, apply: (scene) => { scene.healPlayer(25); } },
+  { id: 'life-drain', name: '生命汲取', rarity: 'rare', type: '回复', description: '击杀普通敌人时抽取微弱生命。', effectText: '击杀普通敌人回复 3 HP', apply: () => undefined },
+  { id: 'potion-belt', name: '药剂腰包', rarity: 'rare', type: '回复', description: '让补给房与药水奖励的治疗更有效。', effectText: '生命药水回复量 +10', apply: (scene) => { scene.relicState.potionHealBonus += 10; } },
+  { id: 'spring-echo', name: '源泉残响', rarity: 'epic', type: '回复', description: '源泉回声只会在进入 Boss 房时触发一次。', effectText: '进入 Boss 房回复 20 HP', apply: () => undefined },
+
+  { id: 'swift-boots', name: '疾步靴', rarity: 'common', type: '技能', description: '脚步变轻，更容易拉开敌人攻击前摇。', effectText: '移动速度 +10%', apply: (scene) => { scene.relicState.moveSpeedMultiplier += 0.1; } },
+  { id: 'cooldown-core', name: '冷却核心', rarity: 'rare', type: '技能', description: '降低 K 冲刺斩与 L 护盾的冷却。', effectText: 'K / L 冷却 -10%', apply: (scene) => { scene.relicState.cooldownReduction = Math.min(0.35, scene.relicState.cooldownReduction + 0.1); } },
+  { id: 'charge-emblem', name: '冲锋纹章', rarity: 'rare', type: '技能', description: '冲刺斩位移距离提高，路径命中范围保持稳定。', effectText: 'K 冲刺距离 +15%', apply: (scene) => { scene.relicState.dashDistanceMultiplier += 0.15; } },
+  { id: 'echo-core', name: '回响核心', rarity: 'epic', type: '技能', description: '每次冲刺斩首次命中敌人时返还少量冷却。', effectText: 'K 命中后返还 1 秒冷却', apply: () => undefined }
+];
 
 const DUNGEON_ASSETS = [
   'floor',
@@ -121,6 +171,7 @@ interface PlayerDamageOptions {
   shakeDuration?: number;
   shakeIntensity?: number;
   emphasized?: boolean;
+  minionDamage?: boolean;
 }
 
 class ProceduralSoundManager {
@@ -180,7 +231,7 @@ export class DungeonScene extends Phaser.Scene {
   private playerClass: PlayerClassConfig;
   private onRunEnd: (runId: string) => void;
 
-  private player!: Fighter;
+  public player!: Fighter;
   private enemies!: Phaser.Physics.Arcade.Group;
   private bullets!: Phaser.Physics.Arcade.Group;
   private walls!: Phaser.Physics.Arcade.StaticGroup;
@@ -199,6 +250,8 @@ export class DungeonScene extends Phaser.Scene {
   private titlePanel?: Phaser.GameObjects.Container;
   private pausePanel?: Phaser.GameObjects.Container;
   private settlementPanel?: Phaser.GameObjects.Container;
+  private rewardPanel?: Phaser.GameObjects.Container;
+  private activeRewardChoices: RewardOption[] = [];
   private doorSprite?: Phaser.GameObjects.Image;
   private doorTween?: Phaser.Tweens.Tween;
   private shieldRing?: Phaser.GameObjects.Arc;
@@ -232,6 +285,8 @@ export class DungeonScene extends Phaser.Scene {
   private skillUses = 0;
   private reachedBossPhaseTwo = false;
   private itemsObtained: string[] = [];
+  public relicState: PlayerRelicState = this.createDefaultRelicState();
+  private epicRewardsTaken = 0;
   private lastFacing = new Phaser.Math.Vector2(1, 0);
   private playerDirection: HunterDirection = 'down';
   private playerWalkFrame: HunterFrame = 'idle';
@@ -289,7 +344,7 @@ export class DungeonScene extends Phaser.Scene {
     this.resetRunState();
     this.createTextures();
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,ESC,R') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,ESC,R,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.walls = this.physics.add.staticGroup();
@@ -299,16 +354,15 @@ export class DungeonScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, 960, 600);
     this.physics.add.collider(this.player, this.walls);
     this.physics.add.collider(this.enemies, this.walls);
-    this.physics.add.overlap(this.player, this.items, (_player, item) => this.pickItem(item as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => this.handleProjectileHitEnemy(bullet as Phaser.Physics.Arcade.Sprite, enemy as Fighter));
 
     this.hudPanel = this.add.container(18, 16).setDepth(80);
-    this.hudPanel.add(this.add.rectangle(0, 0, 265, 104, 0x07101e, 0.72).setOrigin(0).setStrokeStyle(1, 0x2d5f78, 0.8));
+    this.hudPanel.add(this.add.rectangle(0, 0, 318, 124, 0x07101e, 0.72).setOrigin(0).setStrokeStyle(1, 0x2d5f78, 0.8));
     this.hudPanel.add(this.add.text(14, 10, '遗迹猎人', { fontFamily: 'monospace', fontSize: '15px', color: '#eaffff' }));
     this.hpBarBg = this.add.rectangle(14, 37, 176, 13, 0x27101b).setOrigin(0);
     this.hpBarFill = this.add.rectangle(14, 37, 176, 13, 0x35e7c4).setOrigin(0);
     this.hudPanel.add([this.hpBarBg, this.hpBarFill]);
-    this.statusText = this.add.text(14, 58, '', { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 5 });
+    this.statusText = this.add.text(14, 58, '', { fontFamily: 'monospace', fontSize: '13px', color: '#dff7ff', lineSpacing: 4 });
     this.hudPanel.add(this.statusText);
     this.skillText = this.add.text(18, 458, '', { fontFamily: 'monospace', fontSize: '15px', color: '#aefcff', lineSpacing: 7 }).setDepth(80);
     this.roomText = this.add.text(690, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#8fffe6', align: 'right', wordWrap: { width: 250 } }).setDepth(80);
@@ -488,8 +542,15 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
+      if (this.flowState === 'reward') return;
       if (this.flowState === 'paused') this.resumeGame();
       else this.pauseGame();
+      return;
+    }
+    if (this.flowState === 'reward') {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.chooseRewardByIndex(0);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.chooseRewardByIndex(1);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.chooseRewardByIndex(2);
       return;
     }
     if (this.flowState === 'paused') return;
@@ -512,11 +573,12 @@ export class DungeonScene extends Phaser.Scene {
 
     this.updateEnemies(time);
     this.updateBossHazards(time);
-    if (!this.roomCleared && this.countLivingEnemies() === 0) {
-      this.roomCleared = true;
-      this.updateDoor();
-      this.sfx.play('portal');
-      this.log(`${this.currentRoom.name} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
+    if (!this.roomCleared && this.currentRoom.enemies.length > 0 && this.countLivingEnemies() === 0) {
+      if (this.currentRoom.kind === 'battle' || this.currentRoom.kind === 'elite') {
+        this.openRewardChoice(this.currentRoom.kind);
+      } else {
+        this.openPortal(`${this.currentRoom.name} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
+      }
     }
     this.updateInvincibleVisual(time);
     this.updateUi(time);
@@ -632,6 +694,22 @@ export class DungeonScene extends Phaser.Scene {
     return 'spike';
   }
 
+  private createDefaultRelicState(): PlayerRelicState {
+    return {
+      moveSpeedMultiplier: 1,
+      dashDamageMultiplier: 1,
+      dashDistanceMultiplier: 1,
+      bonusDamage: 0,
+      potionHealBonus: 0,
+      cooldownReduction: 0,
+      relics: [],
+      temporaryShield: 0,
+      damageReductionFromMinions: 0,
+      bossRoomHealUsed: false,
+      dashCooldownRefunded: false
+    };
+  }
+
   private resetRunState() {
     this.unitHuds.forEach((hud) => {
       hud.name.destroy();
@@ -654,6 +732,11 @@ export class DungeonScene extends Phaser.Scene {
     this.skillUses = 0;
     this.reachedBossPhaseTwo = false;
     this.itemsObtained = [];
+    this.relicState = this.createDefaultRelicState();
+    this.epicRewardsTaken = 0;
+    this.activeRewardChoices = [];
+    this.rewardPanel?.destroy();
+    this.rewardPanel = undefined;
     this.lastFacing = new Phaser.Math.Vector2(1, 0);
     this.playerDirection = 'down';
     this.playerWalkFrame = 'idle';
@@ -768,7 +851,7 @@ export class DungeonScene extends Phaser.Scene {
   private loadRoom(index: number) {
     this.currentRoomIndex = index;
     this.currentRoom = ROOMS[index];
-    this.roomCleared = this.currentRoom.enemies.length === 0;
+    this.roomCleared = this.currentRoom.enemies.length === 0 && this.currentRoom.kind !== 'treasure';
     this.rewardTaken = !this.currentRoom.reward;
     this.enemies.clear(true, true);
     this.bullets.clear(true, true);
@@ -783,10 +866,24 @@ export class DungeonScene extends Phaser.Scene {
     this.drawRoom();
     this.spawnEnemies();
     this.player.setPosition(170, 320);
+    this.applyRoomEntryRelics();
     this.showRoomTitle();
     this.updateDoor();
     if (this.currentRoom.kind === 'boss') this.sfx.play('bossEnter');
     this.log(this.currentRoom.kind === 'spawn' ? '出生房安全。按 E 进入普通战斗房。' : `${this.currentRoom.name}：${this.currentRoom.description}`);
+  }
+
+  private applyRoomEntryRelics() {
+    if (this.currentRoomIndex > 0 && this.hasRelic('crystal-shield')) {
+      this.relicState.temporaryShield = Math.max(this.relicState.temporaryShield, 10);
+      this.showFloatingText(this.player.x, this.player.y - 70, '晶体护盾 Shield 10', '#8ffcff');
+    }
+    if (this.currentRoom.kind === 'boss' && this.hasRelic('spring-echo') && !this.relicState.bossRoomHealUsed) {
+      this.relicState.bossRoomHealUsed = true;
+      this.healPlayer(20);
+      this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 HP +20', '#d6b4ff');
+      this.log('源泉残响触发：进入 Boss 房回复 20 HP。');
+    }
   }
 
   private drawRoom() {
@@ -891,7 +988,8 @@ export class DungeonScene extends Phaser.Scene {
         if (this.hasGeneratedHunter(this.playerDirection, 'idle')) this.player.setRotation(0);
       }
     }
-    this.player.setVelocity(direction.x * this.player.stats.speed, direction.y * this.player.stats.speed);
+    const speed = this.player.stats.speed * this.relicState.moveSpeedMultiplier;
+    this.player.setVelocity(direction.x * speed, direction.y * speed);
   }
 
   private updatePlayerDirection(direction: Phaser.Math.Vector2, time: number, moving: boolean) {
@@ -923,7 +1021,7 @@ export class DungeonScene extends Phaser.Scene {
     this.skillCooldowns.attack = time + 330;
     this.sfx.play('swing');
     this.showAttackArc(64, 0xffffff, 0.26);
-    this.hitInArc(this.player.stats.atk, 62, '普通攻击', 60, 32, 220);
+    this.hitInArc(this.player.stats.atk + this.relicState.bonusDamage, 62, '普通攻击', 60, 32, 220);
     this.time.delayedCall(150, () => {
       if (this.playerActionState === 'attacking') this.playerActionState = 'normal';
     });
@@ -935,7 +1033,7 @@ export class DungeonScene extends Phaser.Scene {
       this.log('冲刺斩还在冷却。');
       return;
     }
-    this.skillCooldowns.dashSlash = time + 5000;
+    this.skillCooldowns.dashSlash = time + this.getDashCooldownMs();
     this.skillUses += 1;
     this.sfx.play('swing');
     this.playerActionState = 'dashing';
@@ -943,7 +1041,9 @@ export class DungeonScene extends Phaser.Scene {
     this.dashDamageTotal = 0;
     const startX = this.player.x;
     const startY = this.player.y;
-    const target = this.getLegalPoint(startX + this.lastFacing.x * 140, startY + this.lastFacing.y * 140, 18);
+    this.relicState.dashCooldownRefunded = false;
+    const dashDistance = 140 * this.relicState.dashDistanceMultiplier;
+    const target = this.getLegalPoint(startX + this.lastFacing.x * dashDistance, startY + this.lastFacing.y * dashDistance, 18);
     this.player.setVelocity(0, 0);
     this.showDashSlashTrail(startX, startY, target.x, target.y);
     for (let i = 0; i < 4; i += 1) this.time.delayedCall(i * 45, () => this.spawnDashTrail());
@@ -964,7 +1064,7 @@ export class DungeonScene extends Phaser.Scene {
       this.log('护盾还在冷却。');
       return;
     }
-    this.skillCooldowns.shield = time + 8000;
+    this.skillCooldowns.shield = time + this.getShieldCooldownMs();
     this.shieldUntil = time + 3000;
     this.skillUses += 1;
     this.shieldRing?.destroy();
@@ -1039,6 +1139,14 @@ export class DungeonScene extends Phaser.Scene {
     };
   }
 
+  private getDashCooldownMs() {
+    return Math.max(3000, Math.round(5000 * (1 - this.relicState.cooldownReduction)));
+  }
+
+  private getShieldCooldownMs() {
+    return Math.max(5000, Math.round(8000 * (1 - this.relicState.cooldownReduction)));
+  }
+
   private keepEnemyInsideRoom(enemy: Fighter, padding = 22) {
     const legal = this.getLegalPoint(enemy.x, enemy.y, padding);
     if (legal.x !== enemy.x || legal.y !== enemy.y) {
@@ -1089,9 +1197,14 @@ export class DungeonScene extends Phaser.Scene {
       if (!enemy.active || enemy.getData('dying') || this.dashHitEnemies.has(enemy.stats.id)) return;
       if (Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) > (enemy.stats.boss ? 72 : 44)) return;
       this.dashHitEnemies.add(enemy.stats.id);
-      const rawDamage = Math.round(this.player.stats.atk * 1.5);
+      const rawDamage = Math.round((this.player.stats.atk + this.relicState.bonusDamage) * 1.5 * this.relicState.dashDamageMultiplier);
       this.dashDamageTotal += Math.max(1, rawDamage - enemy.stats.def);
       this.damageEnemy(enemy, rawDamage, true);
+      if (this.hasRelic('echo-core') && !this.relicState.dashCooldownRefunded) {
+        this.skillCooldowns.dashSlash = Math.max(this.time.now, this.skillCooldowns.dashSlash - 1000);
+        this.relicState.dashCooldownRefunded = true;
+        this.showFloatingText(this.player.x, this.player.y - 64, '回响核心 -1s', '#d9b8ff');
+      }
       if (!enemy.stats.boss) this.knockbackEnemy(enemy, this.player.x - this.lastFacing.x * 24, this.player.y - this.lastFacing.y * 24, 62, 320);
       else this.startHitStop(95);
       hits += 1;
@@ -1183,7 +1296,7 @@ export class DungeonScene extends Phaser.Scene {
         enemy.stats.nextAttack = time + cooldown;
         if (enemy.stats.kind === 'slime') this.startSlimeAttack(enemy);
         else if (enemy.stats.kind === 'bat') this.startBatDive(enemy);
-        else this.damagePlayer(enemy.stats.atk, enemy.stats.name);
+        else this.damagePlayer(enemy.stats.atk, enemy.stats.name, { minionDamage: true });
       }
       this.keepEnemyInsideRoom(enemy);
     });
@@ -1199,7 +1312,7 @@ export class DungeonScene extends Phaser.Scene {
       if (!enemy.active || enemy.getData('dying')) return;
       enemy.clearTint();
       const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 22;
-      if (hit) this.damagePlayer(enemy.stats.atk, '晶化史莱姆撞击', { shakeDuration: 125, shakeIntensity: 0.005 });
+      if (hit) this.damagePlayer(enemy.stats.atk, '晶化史莱姆撞击', { shakeDuration: 125, shakeIntensity: 0.005, minionDamage: true });
       enemy.setData('stunUntil', this.time.now + 180);
       this.time.delayedCall(180, () => enemy.active && enemy.setData('attackCharging', false));
     });
@@ -1216,7 +1329,7 @@ export class DungeonScene extends Phaser.Scene {
       enemy.clearTint();
       this.showSkeletonAttack(enemy);
       const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
-      if (hit) this.damagePlayer(enemy.stats.atk, '骷髅守卫挥砍', { shakeDuration: 135, shakeIntensity: 0.006 });
+      if (hit) this.damagePlayer(enemy.stats.atk, '骷髅守卫挥砍', { shakeDuration: 135, shakeIntensity: 0.006, minionDamage: true });
       this.time.delayedCall(220, () => {
         if (!enemy.active || enemy.getData('dying')) return;
         enemy.stats.nextAttack = this.time.now + enemy.stats.cooldown;
@@ -1248,7 +1361,7 @@ export class DungeonScene extends Phaser.Scene {
         onComplete: () => {
           if (!enemy.active || enemy.getData('dying')) return;
           const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 26;
-          if (hit) this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006 });
+          if (hit) this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006, minionDamage: true });
           const exit = this.getLegalPoint(enemy.x - Math.cos(diveAngle) * 42, enemy.y - Math.sin(diveAngle) * 42, 22);
           this.tweens.add({
             targets: enemy,
@@ -1267,7 +1380,7 @@ export class DungeonScene extends Phaser.Scene {
       if (false) {
       const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
       if (hit) {
-        this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006 });
+        this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006, minionDamage: true });
         this.knockbackEnemy(enemy, this.player.x, this.player.y, 36, 180);
       }
       this.time.delayedCall(180, () => enemy.active && enemy.setData('attackCharging', false));
@@ -1559,7 +1672,7 @@ export class DungeonScene extends Phaser.Scene {
       const bossSkill = Boolean(projectile.getData('bossSkill'));
       this.damagePlayer(Number(projectile.getData('damage')), String(projectile.getData('hitReason') || '符文弹'), bossSkill
         ? { minDamageRatio: 0.7, invincibleMs: 580, shakeDuration: 155, shakeIntensity: 0.007, emphasized: true }
-        : undefined);
+        : { minionDamage: true });
       this.destroyProjectile(projectile);
     });
   }
@@ -1657,6 +1770,10 @@ export class DungeonScene extends Phaser.Scene {
     const name = enemy.stats.name;
     this.kills += 1;
     this.gold += wasBoss ? 60 : 8;
+    if (!wasBoss && this.hasRelic('life-drain')) {
+      this.healPlayer(3);
+      this.log(`生命汲取触发：击杀 ${name} 回复 3 HP。`);
+    }
     this.destroyUnitHud(enemy);
     enemy.disableBody(true, false);
     if (enemy.stats.kind === 'slime') this.spawnSlimeShards(enemy.x, enemy.y);
@@ -1794,19 +1911,25 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private damagePlayer(rawDamage: number, reason: string, options: PlayerDamageOptions = {}): boolean {
-    if (this.runEnded || !this.player.active || this.time.now < this.invincibleUntil) return false;
+    if (this.runEnded || this.flowState === 'reward' || !this.player.active || this.time.now < this.invincibleUntil) return false;
     const shieldActive = this.time.now < this.shieldUntil;
-    const reducedDamage = Math.max(1, rawDamage - this.player.stats.def);
+    const minionReduction = options.minionDamage ? this.relicState.damageReductionFromMinions : 0;
+    const reducedRawDamage = Math.max(1, Math.round(rawDamage * (1 - minionReduction)));
+    const reducedDamage = Math.max(1, reducedRawDamage - this.player.stats.def);
     const minDamage = options.minDamageRatio ? Math.ceil(rawDamage * options.minDamageRatio) : 1;
     const damageBeforeShield = Math.max(reducedDamage, minDamage);
-    const damage = Math.max(1, Math.round(damageBeforeShield * (shieldActive ? 0.5 : 1)));
+    const damageAfterSkillShield = Math.max(1, Math.round(damageBeforeShield * (shieldActive ? 0.5 : 1)));
+    const shieldAbsorb = Math.min(this.relicState.temporaryShield, damageAfterSkillShield);
+    this.relicState.temporaryShield -= shieldAbsorb;
+    const damage = Math.max(0, damageAfterSkillShield - shieldAbsorb);
     this.player.stats.hp -= damage;
     this.damageTaken += damage;
     this.invincibleUntil = this.time.now + (options.invincibleMs ?? 800);
     this.sfx.play('hurt');
-    this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
+    if (damage > 0) this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
+    else this.showFloatingText(this.player.x, this.player.y - 34, 'Shield', '#8ffcff');
     this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
-    this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? '护盾抵消了部分伤害。' : ''}`);
+    this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? 'L 护盾减免了伤害。' : ''}${shieldAbsorb > 0 ? `临时护盾抵消 ${shieldAbsorb} 点。` : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
     return true;
   }
@@ -1844,9 +1967,155 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.add({ targets: text, y: y - 30, alpha: 0, duration: 680, onComplete: () => text.destroy() });
   }
 
+  public healPlayer(amount: number) {
+    const healed = Math.max(0, Math.min(amount, this.player.stats.maxHp - this.player.stats.hp));
+    this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
+    if (healed > 0) this.showFloatingText(this.player.x, this.player.y - 42, `+${healed} HP`, '#8ffcff');
+    return healed;
+  }
+
+  private hasRelic(id: string) {
+    return this.relicState.relics.some((relic) => relic.id === id);
+  }
+
+  private showFloatingText(x: number, y: number, message: string, color = '#8ffcff') {
+    const text = this.add.text(x, y, message, {
+      fontFamily: 'monospace',
+      fontSize: '16px',
+      color,
+      stroke: '#07101e',
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(120);
+    this.tweens.add({ targets: text, y: y - 34, alpha: 0, duration: 900, onComplete: () => text.destroy() });
+  }
+
+  private openPortal(message: string) {
+    this.roomCleared = true;
+    this.updateDoor();
+    this.sfx.play('portal');
+    this.log(message);
+  }
+
+  private openRewardChoice(trigger: RewardTrigger) {
+    if (this.flowState === 'reward' || this.runEnded) return;
+    this.roomCleared = false;
+    this.player.setVelocity(0, 0);
+    this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
+    this.physics.world.pause();
+    this.flowState = 'reward';
+    this.activeRewardChoices = this.rollRewardChoices(trigger);
+    this.rewardPanel?.destroy();
+    this.rewardPanel = this.add.container(480, 300).setDepth(230);
+    this.rewardPanel.add(this.add.rectangle(0, 0, 720, 360, 0x07101e, 0.97).setStrokeStyle(2, 0x35e7c4, 0.92));
+    this.rewardPanel.add(this.add.text(0, -145, trigger === 'elite' ? '高级战斗奖励' : trigger === 'treasure' ? '宝箱奖励' : '战斗奖励', {
+      fontFamily: 'monospace',
+      fontSize: '28px',
+      color: '#ffffff'
+    }).setOrigin(0.5));
+    this.rewardPanel.add(this.add.text(0, -112, '选择 1 个遗物。按 1 / 2 / 3 或点击卡牌。', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#8ffcff'
+    }).setOrigin(0.5));
+
+    this.activeRewardChoices.forEach((reward, index) => {
+      this.rewardPanel?.add(this.createRewardCard(reward, index));
+    });
+  }
+
+  private rollRewardChoices(trigger: RewardTrigger) {
+    const rarityPlan: RewardRarity[] = trigger === 'battle'
+      ? ['common', Phaser.Math.Between(1, 100) <= 28 ? 'rare' : 'common', 'common']
+      : trigger === 'treasure'
+        ? ['rare', 'rare', Phaser.Math.Between(1, 100) <= 28 && this.epicRewardsTaken < 2 ? 'epic' : 'rare']
+        : ['rare', this.epicRewardsTaken < 2 ? 'epic' : 'rare', Phaser.Math.Between(1, 100) <= 55 && this.epicRewardsTaken < 2 ? 'epic' : 'rare'];
+    const selected: RewardOption[] = [];
+    rarityPlan.forEach((rarity) => {
+      const option = this.pickRewardByRarity(rarity, selected.map((reward) => reward.id));
+      if (option) selected.push(option);
+    });
+    while (selected.length < 3) {
+      const fallback = this.pickRewardByRarity('common', selected.map((reward) => reward.id));
+      if (!fallback) break;
+      selected.push(fallback);
+    }
+    return selected;
+  }
+
+  private pickRewardByRarity(rarity: RewardRarity, excludedIds: string[]) {
+    const candidates = REWARD_POOL.filter((reward) => {
+      if (reward.rarity !== rarity || excludedIds.includes(reward.id)) return false;
+      if (reward.rarity === 'epic' && this.epicRewardsTaken >= 2) return false;
+      if (!reward.stackable && this.hasRelic(reward.id)) return false;
+      return true;
+    });
+    return Phaser.Utils.Array.GetRandom(candidates);
+  }
+
+  private createRewardCard(reward: RewardOption, index: number) {
+    const x = -232 + index * 232;
+    const card = this.add.container(x, 38);
+    const color = reward.rarity === 'common' ? 0x587089 : reward.rarity === 'rare' ? 0x36d7ff : 0xb87cff;
+    const fill = reward.rarity === 'epic' ? 0x1c1231 : 0x0b1628;
+    const rect = this.add.rectangle(0, 0, 206, 230, fill, 0.96).setStrokeStyle(2, color, 0.95).setInteractive({ useHandCursor: true });
+    rect.on('pointerover', () => rect.setFillStyle(reward.rarity === 'epic' ? 0x261944 : 0x10233a, 0.98));
+    rect.on('pointerout', () => rect.setFillStyle(fill, 0.96));
+    rect.on('pointerdown', () => this.chooseRewardByIndex(index));
+    card.add(rect);
+    card.add(this.add.text(-88, -94, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
+    card.add(this.add.text(0, -92, reward.name, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', align: 'center', wordWrap: { width: 168 } }).setOrigin(0.5));
+    card.add(this.add.text(0, -58, `${reward.rarity.toUpperCase()} · ${reward.type}`, { fontFamily: 'monospace', fontSize: '13px', color: reward.rarity === 'common' ? '#c8d8e8' : reward.rarity === 'rare' ? '#8ffcff' : '#d9b8ff' }).setOrigin(0.5));
+    card.add(this.add.text(-82, -26, reward.description, { fontFamily: 'monospace', fontSize: '13px', color: '#dff7ff', wordWrap: { width: 164 }, lineSpacing: 4 }));
+    card.add(this.add.rectangle(0, 74, 166, 38, 0x07101e, 0.82).setStrokeStyle(1, color, 0.72));
+    card.add(this.add.text(0, 74, reward.effectText, { fontFamily: 'monospace', fontSize: '13px', color: '#ffe6ad', align: 'center', wordWrap: { width: 152 } }).setOrigin(0.5));
+    return card;
+  }
+
+  private chooseRewardByIndex(index: number) {
+    if (this.flowState !== 'reward') return;
+    const reward = this.activeRewardChoices[index];
+    if (!reward) return;
+    reward.apply(this);
+    this.relicState.relics.push(reward);
+    if (reward.rarity === 'epic') this.epicRewardsTaken += 1;
+    this.itemsObtained.push(reward.name);
+    this.sfx.play('pickup');
+    this.showRewardParticles(reward.rarity);
+    this.showFloatingText(this.player.x, this.player.y - 76, `获得：${reward.name} ${reward.effectText}`, reward.rarity === 'epic' ? '#d9b8ff' : '#8ffcff');
+    this.log(`获得遗物：${reward.name}，${reward.effectText}。`);
+    this.rewardPanel?.destroy();
+    this.rewardPanel = undefined;
+    this.activeRewardChoices = [];
+    this.rewardTaken = true;
+    this.flowState = 'playing';
+    this.physics.world.resume();
+    this.openPortal('奖励已选择。右侧传送门已开启，按 E 进入下一房间。');
+  }
+
+  private showRewardParticles(rarity: RewardRarity) {
+    const color = rarity === 'epic' ? 0xb87cff : 0x36d7ff;
+    for (let i = 0; i < 10; i += 1) {
+      const angle = (Math.PI * 2 * i) / 10;
+      const particle = this.add.circle(this.player.x, this.player.y - 8, 4, color, 0.82).setDepth(118);
+      this.tweens.add({
+        targets: particle,
+        x: this.player.x + Math.cos(angle) * 42,
+        y: this.player.y - 8 + Math.sin(angle) * 32,
+        alpha: 0,
+        duration: 520,
+        onComplete: () => particle.destroy()
+      });
+    }
+  }
+
   private interact() {
     if (this.currentRoom.reward && !this.rewardTaken) {
-      this.log('先拾取房间奖励。');
+      const item = (this.items.getChildren() as Phaser.Physics.Arcade.Sprite[]).find((candidate) => candidate.active);
+      if (item && Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y) <= 72) {
+        this.pickItem(item);
+        return;
+      }
+      this.log(this.currentRoom.reward === 'chest' ? '靠近宝箱按 E 打开。' : '靠近药水按 E 拾取。');
       return;
     }
     if (!this.roomCleared) {
@@ -1861,34 +2130,21 @@ export class DungeonScene extends Phaser.Scene {
   private pickItem(item: Phaser.Physics.Arcade.Sprite) {
     if (this.rewardTaken) return;
     const type = item.getData('item') as 'chest' | 'potion';
-    this.rewardTaken = true;
     item.disableBody(true, true);
     item.destroy();
     if (type === 'potion') {
+      this.rewardTaken = true;
       this.sfx.play('pickup');
       const lowHpBonus = this.player.stats.hp / this.player.stats.maxHp < 0.4 ? 10 : 0;
-      const healAmount = 25 + lowHpBonus;
-      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmount);
-      this.itemsObtained.push('小型生命药水');
+      const healAmount = 25 + lowHpBonus + this.relicState.potionHealBonus;
+      this.healPlayer(healAmount);
       this.showRewardToast('potion_hp', `获得：小型生命药水 HP +${healAmount}`);
       this.log(`获得小型生命药水：回复 ${healAmount} 点生命。按 E 继续。`);
       return;
     }
     this.sfx.play('chest');
     this.add.sprite(480, 320, this.assetKey('chest_open')).setDisplaySize(54, 54).setDepth(20).setData('roomObj', true);
-    if (Phaser.Math.Between(1, 100) <= 35) {
-      this.player.stats.atk += 3;
-      this.itemsObtained.push('攻击晶石');
-      this.add.sprite(520, 320, this.assetKey('attack_crystal')).setDisplaySize(40, 44).setDepth(20).setData('roomObj', true);
-      this.showRewardToast('attack_crystal', '获得：攻击晶石 ATK +3');
-      this.log('宝箱奖励：攻击晶石，攻击 +3。按 E 继续。');
-    } else {
-      this.player.stats.def += 1;
-      this.itemsObtained.push('防御护符');
-      this.add.sprite(520, 320, this.assetKey('defense_charm')).setDisplaySize(40, 44).setDepth(20).setData('roomObj', true);
-      this.showRewardToast('defense_charm', '获得：防御护符 DEF +1');
-      this.log('宝箱奖励：防御护符，防御 +1。按 E 继续。');
-    }
+    this.openRewardChoice('treasure');
   }
 
   private showRewardToast(assetName: DungeonAssetName, message: string) {
@@ -1930,10 +2186,12 @@ export class DungeonScene extends Phaser.Scene {
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
+    const recentRelics = this.relicState.relics.slice(-3).map((relic) => relic.name).join('、') || '无';
     this.statusText.setText([
-      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}`,
+      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ''}`,
       `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
-      `金币 ${this.gold}    道具 ${this.itemsObtained.join('、') || '无'}`
+      `Gold ${this.gold}    遗物 ${this.relicState.relics.length}`,
+      `近期 ${recentRelics}`
     ]);
     this.skillText.setText([
       '[J] 普通攻击',
@@ -1942,7 +2200,7 @@ export class DungeonScene extends Phaser.Scene {
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/6 ${this.currentRoom.name}`,
-      this.roomCleared ? '传送门：已开启，按 E 进入' : '传送门：清除敌人后开启'
+      this.roomCleared ? '传送门：已开启，按 E 进入' : this.currentRoom.kind === 'treasure' ? '传送门：打开宝箱后开启' : '传送门：清除敌人后开启'
     ]);
     const boss = this.enemies.getChildren().find((enemy) => (enemy as Fighter).stats.boss) as Fighter | undefined;
     if (boss && this.bossBarFill && this.bossBarText) {
@@ -2085,6 +2343,17 @@ export class DungeonScene extends Phaser.Scene {
     return 'D';
   }
 
+  private getBuildSummary() {
+    const counts: Record<RewardType, number> = { 攻击: 0, 生存: 0, 回复: 0, 技能: 0 };
+    this.relicState.relics.forEach((relic) => { counts[relic.type] += 1; });
+    const top = (Object.entries(counts) as [RewardType, number][]).sort((a, b) => b[1] - a[1])[0];
+    if (!top || top[1] === 0) return '未成型';
+    if (top[0] === '攻击') return '攻击流';
+    if (top[0] === '生存') return '防御流';
+    if (top[0] === '技能') return '技能流';
+    return '续航流';
+  }
+
   private finishRun(victory: boolean, reason: string) {
     if (this.runEnded) return;
     this.runEnded = true;
@@ -2099,6 +2368,8 @@ export class DungeonScene extends Phaser.Scene {
     this.doorTween = undefined;
     this.roomTitleToast?.destroy();
     this.roomTitleToast = undefined;
+    this.rewardPanel?.destroy();
+    this.rewardPanel = undefined;
     this.roomText.setVisible(false);
     const endedAt = Date.now();
     const durationSeconds = Math.round((endedAt - this.startedAt) / 1000);
@@ -2117,8 +2388,8 @@ export class DungeonScene extends Phaser.Scene {
       kills: this.kills,
       elitesDefeated: 0,
       goldEarned: this.gold,
-      equipmentFound: this.itemsObtained.length,
-      relicsFound: 0,
+      equipmentFound: 0,
+      relicsFound: this.relicState.relics.length,
       eventsTriggered: this.skillUses,
       bossRemainingHpPercent,
       deathReason: victory ? '源晶净化完成' : reason,
@@ -2132,16 +2403,21 @@ export class DungeonScene extends Phaser.Scene {
     this.settlementPanel = panel;
     panel.add(this.add.rectangle(0, 0, 640, 410, 0x07101e, 0.98).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
     panel.add(this.add.text(-260, -168, victory ? '源晶已净化' : '遗迹探索终止', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }));
+    const relicNames = this.relicState.relics.map((relic) => relic.name).join('、') || '无';
+    const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? '是' : '否';
     panel.add(this.add.text(-260, -112, [
       `结果：${victory ? '胜利，源晶已净化' : '失败，遗迹探索终止'}`,
       `用时：${durationSeconds} 秒`,
       `击杀数：${this.kills}`,
       `受到伤害：${this.damageTaken}`,
       `使用技能次数：${this.skillUses}`,
-      `获得道具：${this.itemsObtained.join('、') || '无'}`,
+      `遗物数量：${this.relicState.relics.length}    Epic：${hasEpic}`,
+      `遗物列表：${relicNames}`,
+      `最终 HP：${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK：${this.player.stats.atk}  DEF：${this.player.stats.def}`,
+      `本局构筑：${this.getBuildSummary()}`,
       `死亡原因：${run.deathReason}`,
       `评分：${grade}`
-    ], { fontFamily: 'monospace', fontSize: '17px', color: '#dff7ff', lineSpacing: 7 }));
+    ], { fontFamily: 'monospace', fontSize: '15px', color: '#dff7ff', lineSpacing: 5, wordWrap: { width: 540 } }));
     panel.add(this.createMenuButton(-105, 158, 170, '重新开始', () => {
       this.settlementPanel?.destroy();
       this.startGame();
