@@ -336,7 +336,7 @@ export class DungeonScene extends Phaser.Scene {
   private doorSprite?: Phaser.GameObjects.Image;
   private doorTween?: Phaser.Tweens.Tween;
   private branchDoorSprites: Phaser.GameObjects.Image[] = [];
-  private branchDoorLabels: Phaser.GameObjects.Text[] = [];
+  private branchDoorLabels: Phaser.GameObjects.GameObject[] = [];
   private branchDoorTweens: Phaser.Tweens.Tween[] = [];
   private shieldRing?: Phaser.GameObjects.Arc;
   private bossBarBg?: Phaser.GameObjects.Rectangle;
@@ -630,7 +630,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
-      if (this.flowState === 'reward') return;
+      if (this.flowState === 'reward' || this.flowState === 'event') return;
       if (this.flowState === 'paused') this.resumeGame();
       else this.pauseGame();
       return;
@@ -829,7 +829,11 @@ export class DungeonScene extends Phaser.Scene {
     const branchable = route
       .slice(1, -3)
       .map((room, offset) => ({ room, index: offset + 1 }))
-      .filter(({ index }) => index + 2 < route.length - 2 && route[index + 1].kind !== route[index + 2].kind);
+      .filter(({ index }) => {
+        if (index + 2 >= route.length - 2 || route[index + 1].kind === route[index + 2].kind) return false;
+        const pair = [route[index + 1].kind, route[index + 2].kind].sort().join('-');
+        return pair !== 'battle-treasure' || Phaser.Math.Between(1, 100) <= 35;
+      });
     const branchCount = Math.min(branchable.length, Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1));
     Phaser.Utils.Array.Shuffle(branchable).slice(0, branchCount).forEach(({ room, index }) => {
       room.nextOptions = [index + 1, index + 2];
@@ -1020,18 +1024,22 @@ export class DungeonScene extends Phaser.Scene {
     this.showRoomTitle();
     this.updateDoor();
     if (this.currentRoom.kind === 'boss') this.sfx.play('bossEnter');
-    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) this.claimRestRoomSupply();
+    if (this.currentRoom.kind === 'rest' && this.currentRoom.rewardClaimed) this.openPortal('补给已使用。传送门已开启，按 E 前往首领房。');
     if (this.currentRoom.kind === 'event' && !this.currentRoom.eventResolved) this.time.delayedCall(420, () => this.openEventChoice());
     this.log(this.currentRoom.kind === 'start' ? '出生房安全。按 E 进入普通战斗房。' : `${this.currentRoom.name}：${this.currentRoom.description}`);
   }
 
   private claimRestRoomSupply() {
-    const lowHpBonus = this.player.stats.hp / this.player.stats.maxHp < 0.4 ? 15 : 0;
+    if (this.currentRoom.rewardClaimed) return;
+    const lowHpBonus = this.player.stats.hp / this.player.stats.maxHp < 0.4 ? 10 : 0;
     const healAmount = 25 + lowHpBonus + this.relicState.potionHealBonus;
-    this.healPlayer(healAmount);
+    const healed = this.healPlayer(healAmount);
     this.currentRoom.rewardClaimed = true;
     this.rewardTaken = true;
-    this.openPortal(`补给房恢复 ${healAmount} HP。传送门已开启，按 E 前往首领房。`);
+    this.sfx.play('pickup');
+    this.showRestUsedEffect();
+    this.showFloatingText(this.player.x, this.player.y - 72, healed > 0 ? `恢复 +${healed} HP` : '生命已满', '#8ffcff');
+    this.openPortal(healed > 0 ? `补给房：源晶治疗台恢复了 ${healed} 点生命。` : '补给房：生命已满，传送门已开启。');
   }
 
   private applyRoomEntryRelics() {
@@ -1079,8 +1087,44 @@ export class DungeonScene extends Phaser.Scene {
     this.doorSprite = this.add.image(right, 320, this.assetKey('door_closed')).setDisplaySize(46, 98).setData('roomObj', true).setDepth(6);
     if (this.currentRoom.reward === 'chest') this.items.add(this.physics.add.staticSprite(480, 320, this.assetKey(this.currentRoom.rewardClaimed ? 'chest_open' : 'chest_closed')).setDisplaySize(52, 52).setDepth(20).setData('item', 'chest'));
     if (this.currentRoom.reward === 'potion') this.items.add(this.physics.add.staticSprite(480, 320, this.assetKey('potion_hp')).setDisplaySize(44, 44).setDepth(20).setData('item', 'potion'));
+    if (this.currentRoom.kind === 'rest') this.createRestSupplyObject();
     if (bossRoom) this.createBossBar();
     else this.destroyBossBar();
+  }
+
+  private createRestSupplyObject() {
+    const used = this.currentRoom.rewardClaimed;
+    const glow = this.add.circle(480, 328, 42, used ? 0x30495a : 0x35e7c4, used ? 0.08 : 0.18).setStrokeStyle(2, used ? 0x526879 : 0x8ffcff, used ? 0.35 : 0.9).setData('roomObj', true).setDepth(18);
+    const altar = this.physics.add.staticSprite(480, 320, this.assetKey('crystal_01')).setDisplaySize(58, 62).setDepth(21).setData('item', 'rest');
+    altar.setTint(used ? 0x5b6875 : 0xbaffff).setAlpha(used ? 0.55 : 1);
+    this.items.add(altar);
+    this.add.text(480, 266, used ? '源晶治疗台（已使用）' : '源晶治疗台', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: used ? '#7c91a8' : '#8ffcff',
+      stroke: '#07101e',
+      strokeThickness: 3
+    }).setOrigin(0.5).setData('roomObj', true).setDepth(82);
+    if (!used) this.tweens.add({ targets: glow, scale: 1.14, alpha: 0.08, yoyo: true, repeat: -1, duration: 820 });
+  }
+
+  private showRestUsedEffect() {
+    this.items.getChildren().forEach((item) => {
+      const sprite = item as Phaser.Physics.Arcade.Sprite;
+      if (sprite.getData('item') === 'rest') sprite.setTint(0x5b6875).setAlpha(0.55);
+    });
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const mote = this.add.circle(480, 320, 4, 0x8ffcff, 0.78).setDepth(92);
+      this.tweens.add({
+        targets: mote,
+        x: 480 + Math.cos(angle) * 46,
+        y: 320 + Math.sin(angle) * 34,
+        alpha: 0,
+        duration: 620,
+        onComplete: () => mote.destroy()
+      });
+    }
   }
 
   private clearBranchDoors() {
@@ -2177,6 +2221,7 @@ export class DungeonScene extends Phaser.Scene {
     this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
     this.physics.world.pause();
     this.flowState = 'reward';
+    this.grantRoomClearBonus(trigger);
     this.activeRewardChoices = this.rollRewardChoices(trigger);
     this.rewardPanel?.destroy();
     this.rewardPanel = this.add.container(480, 300).setDepth(230);
@@ -2197,23 +2242,48 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  private grantRoomClearBonus(trigger: RewardTrigger) {
+    if (trigger === 'treasure') return;
+    const trueElite = trigger === 'elite' && this.currentRoom.name.includes('精英');
+    const gold = trigger === 'battle'
+      ? Phaser.Math.Between(8, 16)
+      : trueElite ? Phaser.Math.Between(24, 36) : Phaser.Math.Between(16, 24);
+    this.gold += gold;
+    this.showFloatingText(this.player.x, this.player.y - 98, `Gold +${gold}`, '#ffe6ad');
+  }
+
   private rollRewardChoices(trigger: RewardTrigger) {
+    const trueElite = trigger === 'elite' && this.currentRoom.name.includes('精英');
     const rarityPlan: RewardRarity[] = trigger === 'battle'
-      ? ['common', Phaser.Math.Between(1, 100) <= 28 ? 'rare' : 'common', 'common']
+      ? ['common', 'common', Phaser.Math.Between(1, 100) <= 42 ? 'rare' : 'common']
       : trigger === 'treasure'
-        ? ['rare', 'rare', Phaser.Math.Between(1, 100) <= 28 && this.epicRewardsTaken < 2 ? 'epic' : 'rare']
-        : ['rare', this.epicRewardsTaken < 2 ? 'epic' : 'rare', Phaser.Math.Between(1, 100) <= 55 && this.epicRewardsTaken < 2 ? 'epic' : 'rare'];
+        ? ['common', 'common', Phaser.Math.Between(1, 100) <= 38 ? 'rare' : 'common']
+        : trueElite
+          ? ['rare', 'rare', Phaser.Math.Between(1, 100) <= 72 && this.epicRewardsTaken < 2 ? 'epic' : 'rare']
+          : ['rare', 'rare', Phaser.Math.Between(1, 100) <= 32 && this.epicRewardsTaken < 2 ? 'epic' : 'rare'];
     const selected: RewardOption[] = [];
     rarityPlan.forEach((rarity) => {
-      const option = this.pickRewardByRarity(rarity, selected.map((reward) => reward.id));
+      const option = this.pickRewardByRarityForTrigger(rarity, selected.map((reward) => reward.id), trigger);
       if (option) selected.push(option);
     });
     while (selected.length < 3) {
-      const fallback = this.pickRewardByRarity('common', selected.map((reward) => reward.id));
+      const fallback = this.pickRewardByRarityForTrigger('common', selected.map((reward) => reward.id), trigger);
       if (!fallback) break;
       selected.push(fallback);
     }
     return selected;
+  }
+
+  private pickRewardByRarityForTrigger(rarity: RewardRarity, excludedIds: string[], trigger: RewardTrigger) {
+    const blockedForTreasure = new Set(['attack-crystal', 'source-dagger', 'echo-core']);
+    const candidates = REWARD_POOL.filter((reward) => {
+      if (reward.rarity !== rarity || excludedIds.includes(reward.id)) return false;
+      if (reward.rarity === 'epic' && this.epicRewardsTaken >= 2) return false;
+      if (!reward.stackable && this.hasRelic(reward.id)) return false;
+      if (trigger === 'treasure' && blockedForTreasure.has(reward.id)) return false;
+      return true;
+    });
+    return Phaser.Utils.Array.GetRandom(candidates);
   }
 
   public pickRewardByRarity(rarity: RewardRarity, excludedIds: string[]) {
@@ -2347,6 +2417,15 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private interact() {
+    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) {
+      const item = (this.items.getChildren() as Phaser.Physics.Arcade.Sprite[]).find((candidate) => candidate.active && candidate.getData('item') === 'rest');
+      if (item && Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y) <= 86) {
+        this.claimRestRoomSupply();
+        return;
+      }
+      this.log('靠近源晶治疗台后按 E 使用补给。');
+      return;
+    }
     if (this.currentRoom.reward && !this.rewardTaken) {
       const item = (this.items.getChildren() as Phaser.Physics.Arcade.Sprite[]).find((candidate) => candidate.active);
       if (item && Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y) <= 72) {
@@ -2382,7 +2461,11 @@ export class DungeonScene extends Phaser.Scene {
 
   private pickItem(item: Phaser.Physics.Arcade.Sprite) {
     if (this.rewardTaken) return;
-    const type = item.getData('item') as 'chest' | 'potion';
+    const type = item.getData('item') as 'chest' | 'potion' | 'rest';
+    if (type === 'rest') {
+      this.claimRestRoomSupply();
+      return;
+    }
     item.disableBody(true, true);
     item.destroy();
     if (type === 'potion') {
@@ -2454,16 +2537,33 @@ export class DungeonScene extends Phaser.Scene {
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.currentRoom.name}`,
-      this.roomCleared
-        ? this.currentRoom.nextOptions.length > 1 ? '分支传送门：靠近目标按 E' : '传送门：已开启，按 E 进入'
-        : this.currentRoom.kind === 'treasure' ? '传送门：打开宝箱后开启' : this.currentRoom.kind === 'event' ? '传送门：完成事件后开启' : '传送门：清除敌人后开启'
-    ]);
+      this.getContextHint(),
+      this.getNearbyBranchHint(),
+    ].filter(Boolean));
     const boss = this.enemies.getChildren().find((enemy) => (enemy as Fighter).stats.boss) as Fighter | undefined;
     if (boss && this.bossBarFill && this.bossBarText) {
       this.bossBarFill.width = 340 * Math.max(0, boss.stats.hp / boss.stats.maxHp);
       this.bossBarText.setText(`晶核守卫 ${Math.max(0, Math.ceil(boss.stats.hp))}/${boss.stats.maxHp}${boss.stats.hp / boss.stats.maxHp < 0.5 ? '  第二阶段' : '  第一阶段'}`);
     }
     if (this.shieldRing) this.shieldRing.setPosition(this.player.x, this.player.y);
+  }
+
+  private getContextHint() {
+    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) return '源晶治疗台：靠近后按 E 使用';
+    if (this.roomCleared) return this.currentRoom.nextOptions.length > 1 ? '分支传送门：靠近目标按 E' : '传送门：已开启，按 E 进入';
+    if (this.currentRoom.kind === 'treasure') return '传送门：打开宝箱后开启';
+    if (this.currentRoom.kind === 'event') return '传送门：完成事件后开启';
+    return '传送门：清除敌人后开启';
+  }
+
+  private getNearbyBranchHint() {
+    if (!this.roomCleared || this.currentRoom.nextOptions.length <= 1) return '';
+    const nearest = this.branchDoorSprites
+      .map((sprite, index) => ({ index, distance: Phaser.Math.Distance.Between(this.player.x, this.player.y, sprite.x, sprite.y) }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (!nearest || nearest.distance > 110) return '';
+    const target = this.dungeonRoute[this.currentRoom.nextOptions[nearest.index]];
+    return `按 E 前往：${target.name}`;
   }
 
   private showRoomTitle() {
@@ -2535,22 +2635,25 @@ export class DungeonScene extends Phaser.Scene {
 
   private createBranchDoors(options: number[]) {
     const targets = options.slice(0, 2);
-    const positions = targets.length === 1 ? [[832, 320]] : [[832, 260], [832, 380]];
+    const positions = targets.length === 1 ? [[806, 320]] : [[806, 246], [806, 394]];
     targets.forEach((targetIndex, index) => {
       const [x, y] = positions[index];
       const targetRoom = this.dungeonRoute[targetIndex];
       const sprite = this.add.image(x, y, this.assetKey(this.roomCleared ? 'door_open' : 'door_closed')).setDisplaySize(44, 84).setData('roomObj', true).setDepth(7);
       sprite.setAlpha(this.roomCleared ? 1 : 0.52).setTint(this.roomCleared ? 0xbaffff : 0x40536a);
-      const label = this.add.text(x - 76, y - 58, `${index === 0 ? '左门' : '右门'}：${targetRoom.name}`, {
+      const tag = this.getBranchRouteTag(targetRoom);
+      const bg = this.add.rectangle(x - 108, y - 62, 184, 42, 0x07101e, 0.82).setStrokeStyle(1, this.roomCleared ? 0x8ffcff : 0x506070).setData('roomObj', true).setDepth(80);
+      const label = this.add.text(x - 196, y - 77, `${index === 0 ? '左门' : '右门'}：${targetRoom.name}\n${tag}`, {
         fontFamily: 'monospace',
-        fontSize: '13px',
+        fontSize: '12px',
         color: this.roomCleared ? '#8ffcff' : '#7c91a8',
         stroke: '#07101e',
         strokeThickness: 3,
-        wordWrap: { width: 150 }
+        wordWrap: { width: 176 },
+        lineSpacing: 2
       }).setDepth(81).setData('roomObj', true);
       this.branchDoorSprites.push(sprite);
-      this.branchDoorLabels.push(label);
+      this.branchDoorLabels.push(label, bg);
       if (this.roomCleared) {
         this.branchDoorTweens.push(this.tweens.add({
           targets: sprite,
@@ -2563,6 +2666,16 @@ export class DungeonScene extends Phaser.Scene {
         }));
       }
     });
+  }
+
+  private getBranchRouteTag(room: RoomDef) {
+    if (room.kind === 'treasure') return '安全 / 较低收益';
+    if (room.kind === 'battle') return '战斗 / 奖励+金币';
+    if (room.kind === 'elite') return room.name.includes('精英') ? '高风险 / 高收益' : '高压 / 稀有奖励';
+    if (room.kind === 'event') return '事件 / 代价收益';
+    if (room.kind === 'rest') return '恢复 / 安全';
+    if (room.kind === 'boss') return '最终挑战';
+    return '继续深入';
   }
 
   private countLivingEnemies() {
