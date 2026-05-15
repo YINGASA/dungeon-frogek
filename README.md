@@ -134,15 +134,3 @@ blender --background --python scripts/blender/generate_low_poly_assets.py
 6. 胜利或失败后，结算数据自动保存。
 7. 打开 Analytics 查看通关率、平均时长、职业胜率、Boss 剩余血量，并生成分析报告。
 
-## 面试讲法
-
-- 为什么做：AI 游戏岗位需要同时理解玩法、内容生产、资源管线和数据反馈，所以我做了一个从生成到试玩再到调优的闭环。
-- AI 用在哪里：关卡配置、怪物与 Boss 机制、装备遗物、事件剧情、运营文案、数据分析报告。
-- 如何提高策划效率：策划输入主题、难度和目标用户，系统生成可编辑 JSON，并立即进入游戏验证。
-- 如何提高美术效率：Asset Forge 可快速产出统一风格的占位资源，Blender 脚本可扩展到低模批量渲染。
-- 如何通过数据优化：每局 GameRun 记录通关率、死亡原因、Boss 剩余血量、职业表现，Analytics 直接给出调优建议。
-- 后续扩展：接入真实图像生成、多房间路径选择 UI、云端分享关卡、自动化平衡测试、更多敌人行为树。
-
-## 简历描述
-
-AI Dungeon Forge：基于 React + Phaser + Express + OpenAI SDK 构建 AI 驱动 Roguelite 地牢与内容生产工具，实现 AI 关卡生成、程序化资产生成、JSON 驱动玩法验证、localStorage 数据采集与调优报告，在无 API key 环境下通过 mock fallback 保证完整演示。
