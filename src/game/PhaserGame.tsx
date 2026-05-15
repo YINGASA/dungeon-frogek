@@ -32,6 +32,7 @@ export const PhaserGame = ({ level, playerClass, onRunEnd }: { level: LevelConfi
             Phaser.Input.Keyboard.KeyCodes.K,
             Phaser.Input.Keyboard.KeyCodes.L,
             Phaser.Input.Keyboard.KeyCodes.E,
+            Phaser.Input.Keyboard.KeyCodes.ESC,
             Phaser.Input.Keyboard.KeyCodes.R
           ]
         }

@@ -29,7 +29,7 @@ export const GamePage = () => {
     <div className="page-grid game-page">
       <aside className="panel sidebar">
         <h2>灵墟地牢</h2>
-        <p>你是遗迹猎人，进入地下遗迹“灵墟”，寻找被污染的源晶。第一版聚焦固定 6 房间地牢和完整战斗闭环。</p>
+        <p>你是遗迹猎人，进入地下遗迹“灵墟”，寻找被污染的源晶。当前版本聚焦固定 6 房间地牢和完整战斗闭环。</p>
         <div className="control-card">
           <strong>角色</strong>
           <span>遗迹猎人</span>
@@ -41,9 +41,9 @@ export const GamePage = () => {
           <span>J 普通攻击</span>
           <span>K 冲刺斩，冷却 5 秒</span>
           <span>L 护盾，持续 3 秒，冷却 8 秒</span>
-          <span>E 互动，R 重新开始</span>
+          <span>E 互动，Esc 暂停，R 重新开始</span>
         </div>
-        <button onClick={() => setGameKey((value) => value + 1)}>重新开始</button>
+        <button onClick={() => setGameKey((value) => value + 1)}>重置游戏实例</button>
         {lastRunId && <p className="success">最近结算已保存：{lastRunId}</p>}
       </aside>
       <section className="panel game-panel">

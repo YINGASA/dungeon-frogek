@@ -4,6 +4,20 @@ import { storageService } from '../../services/storageService';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'spawn' | 'battle' | 'treasure' | 'elite' | 'supply' | 'boss';
+type GameFlowState = 'title' | 'playing' | 'paused' | 'ended';
+type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'shielding' | 'dead';
+type SoundName =
+  | 'swing'
+  | 'hit'
+  | 'hurt'
+  | 'enemyDie'
+  | 'pickup'
+  | 'chest'
+  | 'portal'
+  | 'bossEnter'
+  | 'bossPhase'
+  | 'victory'
+  | 'defeat';
 
 type Fighter = Phaser.Physics.Arcade.Sprite & {
   stats: {
@@ -44,15 +58,15 @@ const ROOMS: RoomDef[] = [
   { id: 'room-3', name: '宝箱房', kind: 'treasure', description: '一只旧宝箱被源晶光芒包裹。', enemies: [], reward: 'chest' },
   { id: 'room-4', name: '高级战斗房', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'bat', 'archer'] },
   { id: 'room-5', name: '补给房', kind: 'supply', description: '石台上放着一瓶小型生命药水。', enemies: [], reward: 'potion' },
-  { id: 'room-6', name: 'Boss 房', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
+  { id: 'room-6', name: '首领房', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
 ];
 
 const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = {
-  slime: { name: '晶化史莱姆', kind: 'slime', hp: 25, maxHp: 25, atk: 5, def: 0, speed: 55, range: 30, cooldown: 1100 },
-  skeleton: { name: '骷髅守卫', kind: 'skeleton', hp: 45, maxHp: 45, atk: 6, def: 2, speed: 82, range: 34, cooldown: 1050 },
-  bat: { name: '暗影蝙蝠', kind: 'bat', hp: 20, maxHp: 20, atk: 6, def: 0, speed: 140, range: 28, cooldown: 820 },
-  archer: { name: '符文射手', kind: 'archer', hp: 35, maxHp: 35, atk: 7, def: 1, speed: 70, range: 230, cooldown: 1450, ranged: true },
-  boss: { name: '晶核守卫', kind: 'boss', hp: 220, maxHp: 220, atk: 10, def: 3, speed: 62, range: 62, cooldown: 1100, boss: true }
+  slime: { name: '晶化史莱姆', kind: 'slime', hp: 25, maxHp: 25, atk: 7, def: 0, speed: 55, range: 30, cooldown: 1100 },
+  skeleton: { name: '骷髅守卫', kind: 'skeleton', hp: 45, maxHp: 45, atk: 10, def: 2, speed: 82, range: 34, cooldown: 1050 },
+  bat: { name: '暗影蝙蝠', kind: 'bat', hp: 20, maxHp: 20, atk: 9, def: 0, speed: 140, range: 28, cooldown: 820 },
+  archer: { name: '符文射手', kind: 'archer', hp: 35, maxHp: 35, atk: 10, def: 1, speed: 70, range: 230, cooldown: 1450, ranged: true },
+  boss: { name: '晶核守卫', kind: 'boss', hp: 220, maxHp: 220, atk: 12, def: 3, speed: 62, range: 62, cooldown: 1100, boss: true }
 };
 
 const DUNGEON_ASSETS = [
@@ -86,6 +100,81 @@ type RuneArcherFrame = (typeof RUNE_ARCHER_FRAMES)[number];
 const GUARDIAN_FRAMES = ['idle_1', 'idle_2', 'walk_1', 'walk_2', 'melee', 'shoot', 'phase2_idle_1', 'phase2_idle_2', 'phase2_melee', 'phase2_shoot'] as const;
 type GuardianFrame = (typeof GUARDIAN_FRAMES)[number];
 
+const BOSS_SKILL_DAMAGE = {
+  phase1: {
+    melee: 18,
+    projectile: 14,
+    spike: 18,
+    shock: 18
+  },
+  phase2: {
+    melee: 22,
+    projectile: 16,
+    spike: 24,
+    shock: 20
+  }
+} as const;
+
+interface PlayerDamageOptions {
+  minDamageRatio?: number;
+  invincibleMs?: number;
+  shakeDuration?: number;
+  shakeIntensity?: number;
+  emphasized?: boolean;
+}
+
+class ProceduralSoundManager {
+  private ctx?: AudioContext;
+  private enabled = false;
+
+  async init() {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      this.ctx ??= new AudioContextClass();
+      if (this.ctx.state === 'suspended') await this.ctx.resume();
+      this.enabled = true;
+    } catch {
+      this.enabled = false;
+    }
+  }
+
+  play(name: SoundName) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const presets: Record<SoundName, { freq: number; end: number; type: OscillatorType; gain: number; slide?: number }> = {
+        swing: { freq: 320, end: 0.08, type: 'triangle', gain: 0.035, slide: 160 },
+        hit: { freq: 150, end: 0.07, type: 'square', gain: 0.045, slide: 70 },
+        hurt: { freq: 110, end: 0.12, type: 'sawtooth', gain: 0.05, slide: 55 },
+        enemyDie: { freq: 240, end: 0.18, type: 'triangle', gain: 0.04, slide: 80 },
+        pickup: { freq: 640, end: 0.16, type: 'sine', gain: 0.035, slide: 980 },
+        chest: { freq: 430, end: 0.2, type: 'triangle', gain: 0.04, slide: 760 },
+        portal: { freq: 520, end: 0.26, type: 'sine', gain: 0.035, slide: 260 },
+        bossEnter: { freq: 90, end: 0.32, type: 'sawtooth', gain: 0.055, slide: 130 },
+        bossPhase: { freq: 120, end: 0.38, type: 'sawtooth', gain: 0.06, slide: 240 },
+        victory: { freq: 520, end: 0.34, type: 'triangle', gain: 0.045, slide: 1040 },
+        defeat: { freq: 220, end: 0.36, type: 'sawtooth', gain: 0.045, slide: 80 }
+      };
+      const preset = presets[name];
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = preset.type;
+      osc.frequency.setValueAtTime(preset.freq, now);
+      if (preset.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(1, preset.slide), now + preset.end);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(preset.gain, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + preset.end);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + preset.end + 0.02);
+    } catch {
+      // Audio should never block gameplay.
+    }
+  }
+}
+
 export class DungeonScene extends Phaser.Scene {
   private level: LevelConfig;
   private playerClass: PlayerClassConfig;
@@ -104,6 +193,12 @@ export class DungeonScene extends Phaser.Scene {
   private roomText!: Phaser.GameObjects.Text;
   private roomTitleToast?: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
+  private hpBarBg!: Phaser.GameObjects.Rectangle;
+  private hpBarFill!: Phaser.GameObjects.Rectangle;
+  private hudPanel?: Phaser.GameObjects.Container;
+  private titlePanel?: Phaser.GameObjects.Container;
+  private pausePanel?: Phaser.GameObjects.Container;
+  private settlementPanel?: Phaser.GameObjects.Container;
   private doorSprite?: Phaser.GameObjects.Image;
   private doorTween?: Phaser.Tweens.Tween;
   private shieldRing?: Phaser.GameObjects.Arc;
@@ -111,6 +206,16 @@ export class DungeonScene extends Phaser.Scene {
   private bossBarFill?: Phaser.GameObjects.Rectangle;
   private bossBarText?: Phaser.GameObjects.Text;
   private unitHuds = new Map<string, UnitHud>();
+  private sfx = new ProceduralSoundManager();
+  private flowState: GameFlowState = 'title';
+  private gameReady = false;
+  private pendingHitStopUntil = 0;
+  private hitStopActive = false;
+  private playerActionState: PlayerActionState = 'normal';
+  private dashHitEnemies = new Set<string>();
+  private dashDamageTotal = 0;
+  private dashLine?: Phaser.GameObjects.Line;
+  private currentRoomBounds = new Phaser.Geom.Rectangle(128, 128, 704, 384);
 
   private currentRoomIndex = 0;
   private currentRoom = ROOMS[0];
@@ -184,7 +289,7 @@ export class DungeonScene extends Phaser.Scene {
     this.resetRunState();
     this.createTextures();
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,R') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,ESC,R') as Record<string, Phaser.Input.Keyboard.Key>;
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.walls = this.physics.add.staticGroup();
@@ -197,25 +302,210 @@ export class DungeonScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.items, (_player, item) => this.pickItem(item as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.bullets, this.enemies, (bullet, enemy) => this.handleProjectileHitEnemy(bullet as Phaser.Physics.Arcade.Sprite, enemy as Fighter));
 
-    this.statusText = this.add.text(16, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#eaffff', lineSpacing: 6 }).setDepth(80);
-    this.skillText = this.add.text(16, 468, '', { fontFamily: 'monospace', fontSize: '15px', color: '#aefcff', lineSpacing: 5 }).setDepth(80);
+    this.hudPanel = this.add.container(18, 16).setDepth(80);
+    this.hudPanel.add(this.add.rectangle(0, 0, 265, 104, 0x07101e, 0.72).setOrigin(0).setStrokeStyle(1, 0x2d5f78, 0.8));
+    this.hudPanel.add(this.add.text(14, 10, '遗迹猎人', { fontFamily: 'monospace', fontSize: '15px', color: '#eaffff' }));
+    this.hpBarBg = this.add.rectangle(14, 37, 176, 13, 0x27101b).setOrigin(0);
+    this.hpBarFill = this.add.rectangle(14, 37, 176, 13, 0x35e7c4).setOrigin(0);
+    this.hudPanel.add([this.hpBarBg, this.hpBarFill]);
+    this.statusText = this.add.text(14, 58, '', { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 5 });
+    this.hudPanel.add(this.statusText);
+    this.skillText = this.add.text(18, 458, '', { fontFamily: 'monospace', fontSize: '15px', color: '#aefcff', lineSpacing: 7 }).setDepth(80);
     this.roomText = this.add.text(690, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#8fffe6', align: 'right', wordWrap: { width: 250 } }).setDepth(80);
-    this.logText = this.add.text(16, 548, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ffe6ad', wordWrap: { width: 900 } }).setDepth(80);
+    this.logText = this.add.text(18, 552, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ffe6ad', wordWrap: { width: 900 } }).setDepth(80);
+    this.setGameplayUiVisible(false);
+    this.player.setVisible(false);
+    this.showTitleScreen();
+  }
 
+  private setGameplayUiVisible(visible: boolean) {
+    this.hudPanel?.setVisible(visible);
+    this.skillText?.setVisible(visible);
+    this.roomText?.setVisible(visible);
+    this.logText?.setVisible(visible);
+  }
+
+  private showTitleScreen() {
+    this.flowState = 'title';
+    this.gameReady = false;
+    this.physics.world.pause();
+    this.setGameplayUiVisible(false);
+    this.destroyBossBar();
+    this.roomTitleToast?.destroy();
+    this.pausePanel?.destroy();
+    this.setWorldVisible(false);
+    this.titlePanel?.destroy();
+    this.titlePanel = this.add.container(480, 300).setDepth(220);
+    this.titlePanel.add(this.add.rectangle(0, 0, 690, 430, 0x07101e, 0.96).setStrokeStyle(2, 0x35e7c4, 0.95));
+    this.titlePanel.add(this.add.text(0, -145, '灵墟地牢', { fontFamily: 'monospace', fontSize: '46px', color: '#ffffff', stroke: '#0bd8c7', strokeThickness: 2 }).setOrigin(0.5));
+    this.titlePanel.add(this.add.text(0, -88, '进入被污染的地下遗迹，击败晶核守卫，净化源晶核心。', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#dff7ff'
+    }).setOrigin(0.5));
+    const startButton = this.createMenuButton(0, 0, 210, '开始游戏', () => {
+      void this.sfx.init();
+      this.startGame();
+    });
+    const helpButton = this.createMenuButton(0, 66, 210, '操作说明', () => this.showControlHelp());
+    this.titlePanel.add(startButton);
+    this.titlePanel.add(helpButton);
+    this.titlePanel.add(this.add.text(0, 145, 'WASD 移动  J 攻击  K 冲刺斩  L 护盾  E 互动  Esc 暂停', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#8fffe6'
+    }).setOrigin(0.5));
+  }
+
+  private showControlHelp() {
+    if (!this.titlePanel) return;
+    const help = this.add.container(0, 34).setDepth(221);
+    help.add(this.add.rectangle(0, 0, 390, 170, 0x0b1628, 0.96).setStrokeStyle(1, 0x8ffcff));
+    help.add(this.add.text(-160, -64, [
+      'WASD / 方向键移动',
+      'J 普通攻击',
+      'K 冲刺斩',
+      'L 护盾',
+      'E 互动',
+      'Esc 暂停'
+    ], { fontFamily: 'monospace', fontSize: '17px', color: '#eaffff', lineSpacing: 7 }));
+    this.titlePanel.add(help);
+    this.time.delayedCall(2600, () => help.destroy());
+  }
+
+  private createMenuButton(x: number, y: number, width: number, label: string, onClick: () => void) {
+    const button = this.add.container(x, y);
+    const rect = this.add.rectangle(0, 0, width, 44, 0x12314c, 0.94).setStrokeStyle(2, 0x35e7c4).setInteractive({ useHandCursor: true });
+    const text = this.add.text(0, 0, label, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+    rect.on('pointerover', () => rect.setFillStyle(0x1d4d70, 0.98));
+    rect.on('pointerout', () => rect.setFillStyle(0x12314c, 0.94));
+    rect.on('pointerdown', onClick);
+    button.add([rect, text]);
+    return button;
+  }
+
+  private startGame() {
+    this.titlePanel?.destroy();
+    this.titlePanel = undefined;
+    this.resetRunState();
+    this.flowState = 'playing';
+    this.gameReady = true;
+    this.time.paused = false;
+    this.physics.world.resume();
+    this.setGameplayUiVisible(true);
+    this.player.stats = {
+      id: 'player',
+      name: '遗迹猎人',
+      kind: 'player',
+      hp: 120,
+      maxHp: 120,
+      atk: 14,
+      def: 4,
+      speed: 175,
+      range: 54,
+      cooldown: 330,
+      nextAttack: 0
+    };
+    this.player.setTexture(this.hunterAssetKey('down')).setDisplaySize(HUNTER_DISPLAY_SIZE, HUNTER_DISPLAY_SIZE).setVisible(true).setActive(true).enableBody(true, 480, 330, true, true);
+    (this.player.body as Phaser.Physics.Arcade.Body).setSize(30, 30, true);
+    this.unitHuds.forEach((hud) => {
+      hud.name.destroy();
+      hud.hpBg.destroy();
+      hud.hpFill.destroy();
+    });
+    this.unitHuds.clear();
+    this.createUnitHud(this.player);
     this.loadRoom(0);
     this.log('进入灵墟。按 E 进入下一房间，战斗房必须清空后才能继续。');
+    this.updateUi(this.time.now);
+  }
+
+  private pauseGame() {
+    if (this.flowState !== 'playing' || this.runEnded) return;
+    this.flowState = 'paused';
+    this.physics.world.pause();
+    this.tweens.pauseAll();
+    this.time.paused = true;
+    this.player.setVelocity(0, 0);
+    this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
+    this.pausePanel?.destroy();
+    this.pausePanel = this.add.container(480, 300).setDepth(210);
+    this.pausePanel.add(this.add.rectangle(0, 0, 430, 315, 0x07101e, 0.97).setStrokeStyle(2, 0x8ffcff));
+    this.pausePanel.add(this.add.text(0, -112, '游戏暂停', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }).setOrigin(0.5));
+    this.pausePanel.add(this.createMenuButton(0, -42, 180, '继续游戏', () => this.resumeGame()));
+    this.pausePanel.add(this.createMenuButton(0, 22, 180, '重新开始', () => this.restartRun()));
+    this.pausePanel.add(this.createMenuButton(0, 86, 180, '返回标题', () => this.returnToTitle()));
+  }
+
+  private resumeGame() {
+    if (this.flowState !== 'paused') return;
+    this.flowState = 'playing';
+    this.pausePanel?.destroy();
+    this.pausePanel = undefined;
+    this.time.paused = false;
+    this.physics.world.resume();
+    this.tweens.resumeAll();
+  }
+
+  private restartRun() {
+    this.pausePanel?.destroy();
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.physics.world.resume();
+    this.setWorldVisible(true);
+    this.startGame();
+  }
+
+  private returnToTitle() {
+    this.pausePanel?.destroy();
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.physics.world.resume();
+    this.setWorldVisible(false);
+    this.showTitleScreen();
+  }
+
+  private setWorldVisible(visible: boolean) {
+    this.player?.setVisible(visible);
+    this.enemies?.setVisible(visible);
+    this.bullets?.setVisible(visible);
+    this.walls?.setVisible(visible);
+    this.items?.setVisible(visible);
+    this.children.list
+      .filter((child) => child.getData?.('roomObj'))
+      .forEach((child) => (child as Phaser.GameObjects.GameObject & { setVisible?: (value: boolean) => void }).setVisible?.(visible));
+    this.unitHuds.forEach((hud) => {
+      hud.name.setVisible(visible);
+      hud.hpBg.setVisible(visible);
+      hud.hpFill.setVisible(visible);
+    });
   }
 
   update(time: number) {
-    if (this.runEnded) {
+    if (this.flowState === 'title') return;
+    if (this.flowState === 'ended' || this.runEnded) {
       if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
       return;
     }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
+      if (this.flowState === 'paused') this.resumeGame();
+      else this.pauseGame();
+      return;
+    }
+    if (this.flowState === 'paused') return;
+    if (this.hitStopActive) {
+      if (time >= this.pendingHitStopUntil) this.endHitStop();
+      else return;
+    }
 
-    this.movePlayer(time);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.J)) this.normalAttack(time);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.K)) this.dashSlash(time);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.activateShield(time);
+    if (this.playerActionState === 'dashing') {
+      this.updateDashHits();
+    } else {
+      this.movePlayer(time);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.J)) this.normalAttack(time);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.K)) this.dashSlash(time);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.activateShield(time);
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.interact();
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
 
@@ -224,6 +514,7 @@ export class DungeonScene extends Phaser.Scene {
     if (!this.roomCleared && this.countLivingEnemies() === 0) {
       this.roomCleared = true;
       this.updateDoor();
+      this.sfx.play('portal');
       this.log(`${this.currentRoom.name} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
     }
     this.updateInvincibleVisual(time);
@@ -341,6 +632,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private resetRunState() {
+    this.unitHuds.forEach((hud) => {
+      hud.name.destroy();
+      hud.hpBg.destroy();
+      hud.hpFill.destroy();
+    });
     this.unitHuds.clear();
     this.currentRoomIndex = 0;
     this.currentRoom = ROOMS[0];
@@ -361,6 +657,10 @@ export class DungeonScene extends Phaser.Scene {
     this.playerDirection = 'down';
     this.playerWalkFrame = 'idle';
     this.nextWalkFrameAt = 0;
+    this.playerActionState = 'normal';
+    this.dashHitEnemies.clear();
+    this.dashDamageTotal = 0;
+    this.dashLine = undefined;
     this.doorSprite = undefined;
     this.shieldRing = undefined;
     this.bossBarBg = undefined;
@@ -484,6 +784,7 @@ export class DungeonScene extends Phaser.Scene {
     this.player.setPosition(170, 320);
     this.showRoomTitle();
     this.updateDoor();
+    if (this.currentRoom.kind === 'boss') this.sfx.play('bossEnter');
     this.log(this.currentRoom.kind === 'spawn' ? '出生房安全。按 E 进入普通战斗房。' : `${this.currentRoom.name}：${this.currentRoom.description}`);
   }
 
@@ -505,6 +806,7 @@ export class DungeonScene extends Phaser.Scene {
     const right = bossRoom ? 880 : 832;
     const top = bossRoom ? 80 : 128;
     const bottom = bossRoom ? 560 : 512;
+    this.currentRoomBounds = new Phaser.Geom.Rectangle(left + 34, top + 34, right - left - 68, bottom - top - 68);
     const wallKey = this.assetKey('wall');
     for (let x = left; x <= right; x += 32) {
       this.walls.add(this.physics.add.staticSprite(x, top, wallKey).setDisplaySize(34, 34).setDepth(4));
@@ -548,8 +850,23 @@ export class DungeonScene extends Phaser.Scene {
       if (kind === 'skeleton') enemy.setData('animFrame', 0).setData('nextAnimAt', 0).setData('attackingVisual', false);
       if (kind === 'bat') enemy.setData('animFrame', 0).setData('nextAnimAt', 0).setData('attackingVisual', false).setData('floatPhase', Phaser.Math.FloatBetween(0, Math.PI * 2));
       if (kind === 'archer') enemy.setData('animFrame', 0).setData('nextAnimAt', 0).setData('castingVisual', false);
-      if (kind === 'boss') enemy.setData('animFrame', 0).setData('nextAnimAt', 0).setData('phase2Visual', false).setData('actionVisual', false);
-      enemy.stats = { ...base, id: `${kind}-${index}-${this.currentRoom.id}`, nextAttack: 0 };
+      if (kind === 'boss') {
+        enemy
+          .setData('animFrame', 0)
+          .setData('nextAnimAt', 0)
+          .setData('phase2Visual', false)
+          .setData('actionVisual', false)
+          .setData('closeSince', 0)
+          .setData('nextShock', this.time.now + 2500)
+          .setData('shockCharging', false)
+          .setData('nextSpike', this.time.now + 2200);
+      }
+      const eliteBoosted = this.currentRoom.kind === 'elite' && kind !== 'boss';
+      const hp = eliteBoosted ? Math.ceil(base.hp * 1.1) : base.hp;
+      const maxHp = eliteBoosted ? Math.ceil(base.maxHp * 1.1) : base.maxHp;
+      const atk = eliteBoosted ? Math.ceil(base.atk * 1.15) : base.atk;
+      const cooldown = eliteBoosted ? Math.round(base.cooldown / 1.1) : base.cooldown;
+      enemy.stats = { ...base, hp, maxHp, atk, cooldown, id: `${kind}-${index}-${this.currentRoom.id}`, nextAttack: 0 };
       this.enemies.add(enemy);
       this.createUnitHud(enemy);
     });
@@ -602,33 +919,55 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private normalAttack(time: number) {
+    if (this.playerActionState !== 'normal') return;
     if (time < this.skillCooldowns.attack) return;
+    this.playerActionState = 'attacking';
     this.skillCooldowns.attack = time + 330;
+    this.sfx.play('swing');
     this.showAttackArc(64, 0xffffff, 0.26);
-    this.hitInArc(this.player.stats.atk, 62, '普通攻击');
+    this.hitInArc(this.player.stats.atk, 62, '普通攻击', 60, 32, 220);
+    this.time.delayedCall(150, () => {
+      if (this.playerActionState === 'attacking') this.playerActionState = 'normal';
+    });
   }
 
   private dashSlash(time: number) {
+    if (this.playerActionState !== 'normal') return;
     if (time < this.skillCooldowns.dashSlash) {
       this.log('冲刺斩还在冷却。');
       return;
     }
     this.skillCooldowns.dashSlash = time + 5000;
     this.skillUses += 1;
-    for (let i = 0; i < 5; i += 1) this.time.delayedCall(i * 38, () => this.spawnDashTrail());
-    this.player.setVelocity(this.lastFacing.x * 500, this.lastFacing.y * 500);
-    this.showAttackArc(92, 0x67d8ff, 0.36);
-    this.time.delayedCall(150, () => {
-      if (this.player.active) this.player.setVelocity(0, 0);
+    this.sfx.play('swing');
+    this.playerActionState = 'dashing';
+    this.dashHitEnemies.clear();
+    this.dashDamageTotal = 0;
+    this.dashDamageTotal = 0;
+    const startX = this.player.x;
+    const startY = this.player.y;
+    const target = this.getLegalPoint(startX + this.lastFacing.x * 140, startY + this.lastFacing.y * 140, 18);
+    this.player.setVelocity(0, 0);
+    this.showDashSlashTrail(startX, startY, target.x, target.y);
+    for (let i = 0; i < 4; i += 1) this.time.delayedCall(i * 45, () => this.spawnDashTrail());
+    this.tweens.add({
+      targets: this.player,
+      x: target.x,
+      y: target.y,
+      duration: 200,
+      ease: 'Quad.easeOut',
+      onUpdate: () => this.updateDashHits(),
+      onComplete: () => this.finishDash()
     });
-    this.hitInArc(Math.round(this.player.stats.atk * 1.8), 92, '冲刺斩');
   }
 
   private activateShield(time: number) {
+    if (this.playerActionState === 'dashing' || this.playerActionState === 'attacking') return;
     if (time < this.skillCooldowns.shield) {
       this.log('护盾还在冷却。');
       return;
     }
+    this.playerActionState = 'shielding';
     this.skillCooldowns.shield = time + 8000;
     this.shieldUntil = time + 3000;
     this.skillUses += 1;
@@ -640,6 +979,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
       this.shieldRing?.destroy();
       this.shieldRing = undefined;
+      if (this.playerActionState === 'shielding') this.playerActionState = 'normal';
     });
     this.log('护盾启动：3 秒内受到伤害减少 50%。');
   }
@@ -657,28 +997,129 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.add({ targets: trail, alpha: 0, scale: 0.72, duration: 260, onComplete: () => trail.destroy() });
   }
 
-  private hitInArc(rawDamage: number, range: number, source: string) {
+  private hitInArc(rawDamage: number, range: number, source: string, hitStopMs: number, knockbackDistance = 0, stunMs = 0) {
     const center = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(range * 0.58));
     let hit = false;
+    const knockedNames: string[] = [];
     this.enemies.getChildren().forEach((object) => {
       const enemy = object as Fighter;
       if (!enemy.active) return;
       if (Phaser.Math.Distance.Between(center.x, center.y, enemy.x, enemy.y) <= range) {
         this.damageEnemy(enemy, rawDamage);
+        if (!enemy.stats.boss && knockbackDistance > 0) {
+          this.knockbackEnemy(enemy, this.player.x, this.player.y, knockbackDistance, stunMs);
+          knockedNames.push(enemy.stats.name);
+        }
         hit = true;
       }
     });
-    this.log(hit ? `${source}命中敌人。` : `${source}挥空。`);
+    if (hit) {
+      this.sfx.play('hit');
+      this.startHitStop(hitStopMs);
+    }
+    if (knockedNames.length === 1) this.log(`${source}命中，击退了${knockedNames[0]}。`);
+    else if (knockedNames.length > 1) this.log(`${source}命中，击退了 ${knockedNames.length} 个敌人。`);
+    else this.log(hit ? `${source}命中敌人。` : `${source}挥空。`);
+  }
+
+  private startHitStop(durationMs: number) {
+    if (this.hitStopActive || this.flowState !== 'playing') return;
+    this.hitStopActive = true;
+    this.pendingHitStopUntil = this.time.now + durationMs;
+    this.physics.world.pause();
+    this.tweens.pauseAll();
+  }
+
+  private endHitStop() {
+    this.hitStopActive = false;
+    if (this.flowState !== 'playing') return;
+    this.physics.world.resume();
+    this.tweens.resumeAll();
+  }
+
+  private getLegalPoint(x: number, y: number, padding = 18) {
+    return {
+      x: Phaser.Math.Clamp(x, this.currentRoomBounds.left + padding, this.currentRoomBounds.right - padding),
+      y: Phaser.Math.Clamp(y, this.currentRoomBounds.top + padding, this.currentRoomBounds.bottom - padding)
+    };
+  }
+
+  private knockbackEnemy(enemy: Fighter, sourceX: number, sourceY: number, distance: number, stunMs: number) {
+    if (!enemy.active || enemy.stats.boss || enemy.getData('dying')) return;
+    const angle = Phaser.Math.Angle.Between(sourceX, sourceY, enemy.x, enemy.y);
+    const target = this.getLegalPoint(enemy.x + Math.cos(angle) * distance, enemy.y + Math.sin(angle) * distance, 22);
+    enemy.setData('stunUntil', this.time.now + stunMs);
+    enemy.setVelocity(0, 0);
+    this.tweens.add({
+      targets: enemy,
+      x: target.x,
+      y: target.y,
+      duration: Math.min(150, stunMs),
+      ease: 'Quad.easeOut'
+    });
+  }
+
+  private showDashSlashTrail(startX: number, startY: number, endX: number, endY: number) {
+    this.dashLine?.destroy();
+    this.dashLine = this.add.line(0, 0, startX, startY, endX, endY, 0x67f4ff, 0.34).setOrigin(0).setLineWidth(8).setDepth(27);
+    this.tweens.add({
+      targets: this.dashLine,
+      alpha: 0,
+      duration: 230,
+      onComplete: () => {
+        this.dashLine?.destroy();
+        this.dashLine = undefined;
+      }
+    });
+  }
+
+  private updateDashHits() {
+    if (this.playerActionState !== 'dashing') return;
+    let hits = 0;
+    this.enemies.getChildren().forEach((object) => {
+      const enemy = object as Fighter;
+      if (!enemy.active || enemy.getData('dying') || this.dashHitEnemies.has(enemy.stats.id)) return;
+      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) > (enemy.stats.boss ? 72 : 44)) return;
+      this.dashHitEnemies.add(enemy.stats.id);
+      const rawDamage = Math.round(this.player.stats.atk * 1.5);
+      this.dashDamageTotal += Math.max(1, rawDamage - enemy.stats.def);
+      this.damageEnemy(enemy, rawDamage, true);
+      if (!enemy.stats.boss) this.knockbackEnemy(enemy, this.player.x - this.lastFacing.x * 24, this.player.y - this.lastFacing.y * 24, 62, 320);
+      else this.startHitStop(95);
+      hits += 1;
+    });
+    if (hits === 1) this.log(`冲刺斩贯穿敌人，造成 ${this.dashDamageTotal} 点伤害。`);
+    if (hits > 1) this.log(`冲刺斩命中 ${hits} 个敌人。`);
+  }
+
+  private finishDash() {
+    this.player.setVelocity(0, 0);
+    const legal = this.getLegalPoint(this.player.x, this.player.y, 18);
+    this.player.setPosition(legal.x, legal.y);
+    const boss = this.enemies.getChildren().find((enemy) => (enemy as Fighter).active && (enemy as Fighter).stats.boss) as Fighter | undefined;
+    if (boss && Phaser.Math.Distance.Between(this.player.x, this.player.y, boss.x, boss.y) < 58) {
+      this.knockbackPlayerFrom(boss.x, boss.y, 38);
+    }
+    if (this.dashHitEnemies.size > 0) this.log(`冲刺斩命中 ${this.dashHitEnemies.size} 个敌人，共造成 ${this.dashDamageTotal} 点伤害。`);
+    else this.log('冲刺斩掠过地面。');
+    this.dashHitEnemies.clear();
+    if (this.playerActionState === 'dashing') this.playerActionState = 'normal';
   }
 
   private updateEnemies(time: number) {
     this.enemies.getChildren().forEach((object) => {
       const enemy = object as Fighter;
       if (!enemy.active || enemy.getData('dying')) return;
+      if (!enemy.stats.boss && time < Number(enemy.getData('stunUntil') ?? 0)) {
+        enemy.setVelocity(0, 0);
+        return;
+      }
       const distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
       const phaseTwo = Boolean(enemy.stats.boss && enemy.stats.hp / enemy.stats.maxHp < 0.5);
       if (phaseTwo) this.reachedBossPhaseTwo = true;
-      const cooldown = phaseTwo ? enemy.stats.cooldown / 1.2 : enemy.stats.cooldown;
+      const cooldown = enemy.stats.boss
+        ? phaseTwo ? enemy.stats.cooldown / 1.35 : enemy.stats.cooldown * 0.9
+        : phaseTwo ? enemy.stats.cooldown / 1.3 : enemy.stats.cooldown;
       if (enemy.stats.kind === 'slime') this.updateSlimeAnimation(enemy, time);
       if (enemy.stats.kind === 'skeleton') this.updateSkeletonAnimation(enemy, time, distance);
       if (enemy.stats.kind === 'bat') this.updateBatAnimation(enemy, time, distance);
@@ -815,7 +1256,8 @@ export class DungeonScene extends Phaser.Scene {
   private updateGuardianAnimation(enemy: Fighter, time: number, distance: number, phaseTwo: boolean) {
     if (phaseTwo && !enemy.getData('phase2Visual')) {
       enemy.setData('phase2Visual', true);
-      this.cameras.main.shake(180, 0.006);
+      this.cameras.main.shake(260, 0.008);
+      this.sfx.play('bossPhase');
       this.log('晶核守卫的源晶开始暴走！');
       const burst = this.add.circle(enemy.x, enemy.y, 42, 0xff4fa3, 0.16).setStrokeStyle(4, 0xffb3dc, 0.86).setDepth(27);
       this.tweens.add({ targets: burst, scale: 2.1, alpha: 0, duration: 520, onComplete: () => burst.destroy() });
@@ -835,6 +1277,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private updateBoss(enemy: Fighter, distance: number, time: number, cooldown: number, phaseTwo: boolean) {
+    this.updateBossShock(enemy, distance, time, phaseTwo);
+    if (enemy.getData('shockCharging')) {
+      enemy.setVelocity(0, 0);
+      return;
+    }
     if (distance > 92) this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
     else if (distance < 72) this.physics.moveToObject(enemy, this.player, -enemy.stats.speed * 0.7);
     else enemy.setVelocity(0, 0);
@@ -843,6 +1290,48 @@ export class DungeonScene extends Phaser.Scene {
     enemy.stats.nextAttack = time + cooldown;
     if (distance <= 92) this.startBossMelee(enemy, phaseTwo);
     this.fireEnemyProjectile(enemy, phaseTwo);
+  }
+
+  private updateBossShock(enemy: Fighter, distance: number, time: number, phaseTwo: boolean) {
+    if (enemy.getData('shockCharging')) return;
+    const triggerDistance = phaseTwo ? 88 : 80;
+    if (distance > triggerDistance) {
+      enemy.setData('closeSince', 0);
+      return;
+    }
+    const closeSince = Number(enemy.getData('closeSince') ?? 0) || time;
+    enemy.setData('closeSince', closeSince);
+    if (time - closeSince < (phaseTwo ? 1200 : 1500)) return;
+    if (time < Number(enemy.getData('nextShock') ?? 0)) return;
+    this.startBossShock(enemy, phaseTwo);
+  }
+
+  private startBossShock(enemy: Fighter, phaseTwo: boolean) {
+    enemy.setData('shockCharging', true);
+    enemy.setData('nextShock', this.time.now + (phaseTwo ? 4000 : 5000));
+    enemy.setData('closeSince', 0);
+    const radius = phaseTwo ? 108 : 96;
+    const warning = this.add.circle(enemy.x, enemy.y, radius, phaseTwo ? 0xff3f98 : 0x42cfff, 0.12).setStrokeStyle(4, phaseTwo ? 0xff8ac6 : 0x9fffff, 0.9).setDepth(23);
+    this.tweens.add({ targets: warning, scale: 1.1, alpha: 0.3, yoyo: true, repeat: 2, duration: 190 });
+    this.log('晶核守卫正在蓄积晶核震荡，快拉开距离！');
+    this.time.delayedCall(600, () => {
+      warning.destroy();
+      enemy.setData('shockCharging', false);
+      if (!enemy.active || this.runEnded) return;
+      const burst = this.add.circle(enemy.x, enemy.y, radius, phaseTwo ? 0xff4fa3 : 0x67d8ff, 0.18).setStrokeStyle(5, phaseTwo ? 0xffd2eb : 0xd8ffff, 0.86).setDepth(27);
+      this.tweens.add({ targets: burst, scale: 1.35, alpha: 0, duration: 300, onComplete: () => burst.destroy() });
+      if (Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= radius) {
+        const damage = phaseTwo ? BOSS_SKILL_DAMAGE.phase2.shock : BOSS_SKILL_DAMAGE.phase1.shock;
+        const damaged = this.damagePlayer(damage, '晶核震荡', {
+          minDamageRatio: 0.7,
+          invincibleMs: 600,
+          shakeDuration: 230,
+          shakeIntensity: 0.01,
+          emphasized: true
+        });
+        if (damaged) this.knockbackPlayerFrom(enemy.x, enemy.y, phaseTwo ? 78 : 68);
+      }
+    });
   }
 
   private startBossMelee(enemy: Fighter, phaseTwo: boolean) {
@@ -860,7 +1349,14 @@ export class DungeonScene extends Phaser.Scene {
       wave.setRotation(angle);
       this.tweens.add({ targets: wave, alpha: 0, scale: 1.22, duration: 220, onComplete: () => wave.destroy() });
       if (Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= 104) {
-        this.damagePlayer(enemy.stats.atk + (phaseTwo ? 2 : 0), '晶核守卫重击');
+        const damaged = this.damagePlayer(phaseTwo ? BOSS_SKILL_DAMAGE.phase2.melee : BOSS_SKILL_DAMAGE.phase1.melee, '晶核守卫重击', {
+          minDamageRatio: 0.7,
+          invincibleMs: 600,
+          shakeDuration: 190,
+          shakeIntensity: 0.008,
+          emphasized: true
+        });
+        if (damaged) this.knockbackPlayerFrom(enemy.x, enemy.y, 56);
       }
       this.time.delayedCall(150, () => {
         if (!enemy.active || enemy.getData('dying')) return;
@@ -887,11 +1383,14 @@ export class DungeonScene extends Phaser.Scene {
       }
       const bullet = this.physics.add.sprite(enemy.x, enemy.y, isBossProjectile ? this.guardianProjectileKey() : isRuneProjectile ? this.runeProjectileKey() : 'bullet');
       bullet.setDepth(26).setDisplaySize(enemy.stats.boss ? 22 : 16, enemy.stats.boss ? 22 : 16);
-      bullet.setData('damage', enemy.stats.atk);
+      const phaseTwo = isBossProjectile && enemy.stats.hp / enemy.stats.maxHp < 0.5;
+      bullet.setData('damage', isBossProjectile ? phaseTwo ? BOSS_SKILL_DAMAGE.phase2.projectile : BOSS_SKILL_DAMAGE.phase1.projectile : enemy.stats.atk);
       bullet.setData('owner', 'enemy');
       bullet.setData('handled', false);
       bullet.setData('runeProjectile', isRuneProjectile);
       bullet.setData('guardianProjectile', isBossProjectile);
+      bullet.setData('hitReason', isBossProjectile ? '晶体弹' : '符文弹道');
+      bullet.setData('bossSkill', isBossProjectile);
       this.bullets.add(bullet);
       const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y) + Phaser.Math.DegToRad(offset);
       bullet.setRotation(angle);
@@ -923,7 +1422,10 @@ export class DungeonScene extends Phaser.Scene {
       if (!projectile.active || projectile.getData('owner') !== 'enemy' || projectile.getData('handled')) return;
       if (Phaser.Math.Distance.Between(projectile.x, projectile.y, this.player.x, this.player.y) > 24) return;
       projectile.setData('handled', true);
-      this.damagePlayer(Number(projectile.getData('damage')), '符文弹道');
+      const bossSkill = Boolean(projectile.getData('bossSkill'));
+      this.damagePlayer(Number(projectile.getData('damage')), String(projectile.getData('hitReason') || '符文弹道'), bossSkill
+        ? { minDamageRatio: 0.7, invincibleMs: 580, shakeDuration: 155, shakeIntensity: 0.007, emphasized: true }
+        : undefined);
       this.destroyProjectile(projectile);
     });
   }
@@ -977,24 +1479,34 @@ export class DungeonScene extends Phaser.Scene {
 
   private updateBossHazards(time: number) {
     const boss = this.enemies.getChildren().find((enemy) => (enemy as Fighter).stats.boss) as Fighter | undefined;
-    if (!boss || boss.stats.hp / boss.stats.maxHp >= 0.5 || time < (boss.getData('nextSpike') ?? 0)) return;
-    boss.setData('nextSpike', time + 2500);
+    if (!boss || time < (boss.getData('nextSpike') ?? 0)) return;
+    const phaseTwo = boss.stats.hp / boss.stats.maxHp < 0.5;
+    boss.setData('nextSpike', time + (phaseTwo ? 2100 : 3400));
     const x = Phaser.Math.Between(250, 720);
     const y = Phaser.Math.Between(210, 450);
-    const warning = this.add.circle(x, y, 34, 0x9b3cff, 0.2).setStrokeStyle(3, 0xff6dff).setDepth(12);
+    const warning = this.add.circle(x, y, phaseTwo ? 38 : 34, phaseTwo ? 0xff2f85 : 0x9b3cff, phaseTwo ? 0.24 : 0.18).setStrokeStyle(phaseTwo ? 4 : 3, phaseTwo ? 0xffa1df : 0xff6dff).setDepth(12);
     this.time.delayedCall(800, () => {
       warning.destroy();
       const spike = this.add.sprite(x, y, this.guardianSpikeKey()).setDepth(18).setDisplaySize(46, 46);
-      if (!this.runEnded && Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y) < 44) this.damagePlayer(9, '晶体尖刺');
+      if (!this.runEnded && Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y) < 48) {
+        this.damagePlayer(phaseTwo ? BOSS_SKILL_DAMAGE.phase2.spike : BOSS_SKILL_DAMAGE.phase1.spike, '晶体地刺', {
+          minDamageRatio: 0.7,
+          invincibleMs: 580,
+          shakeDuration: 175,
+          shakeIntensity: 0.008,
+          emphasized: true
+        });
+      }
       this.tweens.add({ targets: spike, alpha: 0, scale: 1.35, duration: 360, onComplete: () => spike.destroy() });
     });
   }
 
-  private damageEnemy(enemy: Fighter, rawDamage: number) {
+  private damageEnemy(enemy: Fighter, rawDamage: number, emphasized = false) {
     if (!enemy.active || enemy.getData('dying')) return;
     const damage = Math.max(1, rawDamage - enemy.stats.def);
     enemy.stats.hp -= damage;
-    this.showDamageNumber(enemy.x, enemy.y - 28, damage, '#ffffff');
+    this.sfx.play('hit');
+    this.showDamageNumber(enemy.x, enemy.y - 28, damage, emphasized ? '#8ffcff' : '#ffffff', emphasized);
     enemy.setTint(enemy.stats.kind === 'slime' ? 0xeaffff : enemy.stats.kind === 'skeleton' ? 0xffdddd : enemy.stats.kind === 'bat' ? 0xf0d2ff : enemy.stats.kind === 'archer' ? 0xded8ff : enemy.stats.boss ? 0xf1fbff : 0xffffff);
     if (enemy.stats.kind === 'slime') enemy.setAlpha(1);
     this.time.delayedCall(95, () => {
@@ -1006,6 +1518,7 @@ export class DungeonScene extends Phaser.Scene {
   private killEnemy(enemy: Fighter) {
     if (enemy.getData('dying')) return;
     enemy.setData('dying', true);
+    this.sfx.play('enemyDie');
     const wasBoss = enemy.stats.boss;
     const name = enemy.stats.name;
     this.kills += 1;
@@ -1146,17 +1659,35 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  private damagePlayer(rawDamage: number, reason: string) {
-    if (this.runEnded || !this.player.active || this.time.now < this.invincibleUntil) return;
+  private damagePlayer(rawDamage: number, reason: string, options: PlayerDamageOptions = {}): boolean {
+    if (this.runEnded || !this.player.active || this.time.now < this.invincibleUntil) return false;
     const shieldActive = this.time.now < this.shieldUntil;
-    const damage = Math.max(1, Math.round((rawDamage - this.player.stats.def) * (shieldActive ? 0.5 : 1)));
+    const reducedDamage = Math.max(1, rawDamage - this.player.stats.def);
+    const minDamage = options.minDamageRatio ? Math.ceil(rawDamage * options.minDamageRatio) : 1;
+    const damageBeforeShield = Math.max(reducedDamage, minDamage);
+    const damage = Math.max(1, Math.round(damageBeforeShield * (shieldActive ? 0.5 : 1)));
     this.player.stats.hp -= damage;
     this.damageTaken += damage;
-    this.invincibleUntil = this.time.now + 800;
-    this.showDamageNumber(this.player.x, this.player.y - 34, damage, '#ff8aa8');
-    this.cameras.main.shake(90, 0.004);
-    this.log(`${reason}造成 ${damage} 点伤害。`);
+    this.invincibleUntil = this.time.now + (options.invincibleMs ?? 800);
+    this.sfx.play('hurt');
+    this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
+    this.cameras.main.shake(options.shakeDuration ?? (damage >= 8 ? 165 : 120), options.shakeIntensity ?? (damage >= 8 ? 0.007 : 0.005));
+    this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? '护盾抵消了部分伤害。' : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
+    return true;
+  }
+
+  private knockbackPlayerFrom(sourceX: number, sourceY: number, distance: number) {
+    const angle = Phaser.Math.Angle.Between(sourceX, sourceY, this.player.x, this.player.y);
+    const targetX = Phaser.Math.Clamp(this.player.x + Math.cos(angle) * distance, 122, 838);
+    const targetY = Phaser.Math.Clamp(this.player.y + Math.sin(angle) * distance, 122, 518);
+    this.tweens.add({
+      targets: this.player,
+      x: targetX,
+      y: targetY,
+      duration: 105,
+      ease: 'Quad.easeOut'
+    });
   }
 
   private updateInvincibleVisual(time: number) {
@@ -1170,8 +1701,8 @@ export class DungeonScene extends Phaser.Scene {
     if (time >= this.shieldUntil) this.player.clearTint();
   }
 
-  private showDamageNumber(x: number, y: number, damage: number, color: string) {
-    const text = this.add.text(x - 10, y, `-${damage}`, { fontFamily: 'monospace', fontSize: '18px', color, stroke: '#07101e', strokeThickness: 3 }).setDepth(90);
+  private showDamageNumber(x: number, y: number, damage: number, color: string, emphasized = false) {
+    const text = this.add.text(x - 10, y, `-${damage}`, { fontFamily: 'monospace', fontSize: emphasized ? '22px' : '18px', color, stroke: '#07101e', strokeThickness: 3 }).setDepth(90);
     this.tweens.add({ targets: text, y: y - 30, alpha: 0, duration: 680, onComplete: () => text.destroy() });
   }
 
@@ -1181,10 +1712,11 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (!this.roomCleared) {
-      this.log('敌人尚未清理，传送门仍然关闭。');
+      this.log('清除敌人后传送门才会开启。');
       return;
     }
     if (this.currentRoomIndex >= ROOMS.length - 1) return;
+    this.sfx.play('portal');
     this.loadRoom(this.currentRoomIndex + 1);
   }
 
@@ -1195,12 +1727,14 @@ export class DungeonScene extends Phaser.Scene {
     item.disableBody(true, true);
     item.destroy();
     if (type === 'potion') {
+      this.sfx.play('pickup');
       this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + 30);
       this.itemsObtained.push('小型生命药水');
       this.showRewardToast('potion_hp', '获得：小型生命药水 HP +30');
       this.log('获得小型生命药水：回复 30 点生命。按 E 继续。');
       return;
     }
+    this.sfx.play('chest');
     this.add.sprite(480, 320, this.assetKey('chest_open')).setDisplaySize(54, 54).setDepth(20).setData('roomObj', true);
     if (Phaser.Math.Between(0, 1) === 0) {
       this.player.stats.atk += 3;
@@ -1209,11 +1743,11 @@ export class DungeonScene extends Phaser.Scene {
       this.showRewardToast('attack_crystal', '获得：攻击晶石 ATK +3');
       this.log('宝箱奖励：攻击晶石，攻击 +3。按 E 继续。');
     } else {
-      this.player.stats.def += 2;
+      this.player.stats.def += 1;
       this.itemsObtained.push('防御护符');
       this.add.sprite(520, 320, this.assetKey('defense_charm')).setDisplaySize(40, 44).setDepth(20).setData('roomObj', true);
-      this.showRewardToast('defense_charm', '获得：防御护符 DEF +2');
-      this.log('宝箱奖励：防御护符，防御 +2。按 E 继续。');
+      this.showRewardToast('defense_charm', '获得：防御护符 DEF +1');
+      this.log('宝箱奖励：防御护符，防御 +1。按 E 继续。');
     }
   }
 
@@ -1251,20 +1785,22 @@ export class DungeonScene extends Phaser.Scene {
   private updateUi(time: number) {
     const dashLeft = Math.max(0, Math.ceil((this.skillCooldowns.dashSlash - time) / 1000));
     const shieldLeft = Math.max(0, Math.ceil((this.skillCooldowns.shield - time) / 1000));
+    const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
+    this.hpBarFill.width = 176 * hpRatio;
+    this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
     this.statusText.setText([
       `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}`,
-      `ATK ${this.player.stats.atk}  DEF ${this.player.stats.def}`,
-      `金币 ${this.gold}`,
-      `道具 ${this.itemsObtained.join('、') || '无'}`
+      `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
+      `金币 ${this.gold}    道具 ${this.itemsObtained.join('、') || '无'}`
     ]);
     this.skillText.setText([
-      'J 普通攻击',
-      `K 冲刺斩：${dashLeft === 0 ? '可用' : `冷却 ${dashLeft} 秒`}`,
-      `L 护盾：${shieldLeft === 0 ? '可用' : `冷却 ${shieldLeft} 秒`}`
+      '[J] 普通攻击',
+      `[K] 冲刺斩：${dashLeft === 0 ? '可用' : `冷却 ${dashLeft} 秒`}`,
+      `[L] 护盾：${shieldLeft === 0 ? '可用' : `冷却 ${shieldLeft} 秒`}`
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/6 ${this.currentRoom.name}`,
-      this.roomCleared ? '传送门：已开启' : '传送门：封锁中'
+      this.roomCleared ? '传送门：已开启，按 E 进入' : '传送门：清除敌人后开启'
     ]);
     const boss = this.enemies.getChildren().find((enemy) => (enemy as Fighter).stats.boss) as Fighter | undefined;
     if (boss && this.bossBarFill && this.bossBarText) {
@@ -1276,25 +1812,28 @@ export class DungeonScene extends Phaser.Scene {
 
   private showRoomTitle() {
     this.roomTitleToast?.destroy();
-    this.roomTitleToast = this.add.text(480, 100, `${this.currentRoomIndex + 1}/6 ${this.currentRoom.name}`, {
+    const title = this.currentRoom.kind === 'boss'
+      ? '第 6 房：首领房：晶核守卫'
+      : `第 ${this.currentRoomIndex + 1} 房：${this.currentRoom.name}`;
+    this.roomTitleToast = this.add.text(480, 300, title, {
       fontFamily: 'monospace',
-      fontSize: '26px',
-      color: '#ffffff',
+      fontSize: this.currentRoom.kind === 'boss' ? '30px' : '28px',
+      color: this.currentRoom.kind === 'boss' ? '#ffd7e6' : '#ffffff',
       stroke: '#07101e',
-      strokeThickness: 5
+      strokeThickness: 6
     }).setOrigin(0.5).setAlpha(0).setDepth(95);
     this.tweens.add({
       targets: this.roomTitleToast,
       alpha: 1,
-      y: 92,
+      y: 286,
       duration: 220,
       onComplete: () => {
         if (!this.roomTitleToast || this.runEnded) return;
         this.tweens.add({
           targets: this.roomTitleToast,
           alpha: 0,
-          y: 82,
-          delay: 1200,
+          y: 272,
+          delay: 1000,
           duration: 420,
           onComplete: () => {
             this.roomTitleToast?.destroy();
@@ -1407,6 +1946,9 @@ export class DungeonScene extends Phaser.Scene {
   private finishRun(victory: boolean, reason: string) {
     if (this.runEnded) return;
     this.runEnded = true;
+    this.flowState = 'ended';
+    this.playerActionState = 'dead';
+    this.sfx.play(victory ? 'victory' : 'defeat');
     this.player.setVelocity(0, 0);
     this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
     this.bullets.clear(true, true);
@@ -1441,10 +1983,14 @@ export class DungeonScene extends Phaser.Scene {
       score: grade === 'A' ? 95 : grade === 'B' ? 82 : grade === 'C' ? 65 : 45
     };
     storageService.saveRun(run);
-    const panel = this.add.container(480, 300).setDepth(200);
-    panel.add(this.add.rectangle(0, 0, 610, 365, 0x07101e, 0.97).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
-    panel.add(this.add.text(-250, -150, victory ? '通关结算' : '失败结算', { fontSize: '28px', color: '#ffffff' }));
-    panel.add(this.add.text(-250, -98, [
+    this.setGameplayUiVisible(false);
+    this.setWorldVisible(true);
+    this.settlementPanel?.destroy();
+    const panel = this.add.container(480, 300).setDepth(240);
+    this.settlementPanel = panel;
+    panel.add(this.add.rectangle(0, 0, 640, 410, 0x07101e, 0.98).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
+    panel.add(this.add.text(-260, -168, victory ? '源晶已净化' : '遗迹探索终止', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }));
+    panel.add(this.add.text(-260, -112, [
       `结果：${victory ? '胜利，源晶已净化' : '失败，遗迹探索终止'}`,
       `用时：${durationSeconds} 秒`,
       `击杀数：${this.kills}`,
@@ -1454,10 +2000,14 @@ export class DungeonScene extends Phaser.Scene {
       `死亡原因：${run.deathReason}`,
       `评分：${grade}`
     ], { fontFamily: 'monospace', fontSize: '17px', color: '#dff7ff', lineSpacing: 7 }));
-    const button = this.add.rectangle(0, 138, 180, 44, 0x16314d).setStrokeStyle(2, 0x8ffcff).setInteractive({ useHandCursor: true });
-    const label = this.add.text(0, 138, '重新开始', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
-    button.on('pointerdown', () => this.scene.restart());
-    panel.add([button, label]);
+    panel.add(this.createMenuButton(-105, 158, 170, '重新开始', () => {
+      this.settlementPanel?.destroy();
+      this.startGame();
+    }));
+    panel.add(this.createMenuButton(105, 158, 170, '返回标题', () => {
+      this.settlementPanel?.destroy();
+      this.returnToTitle();
+    }));
     this.onRunEnd(run.id);
   }
 }
