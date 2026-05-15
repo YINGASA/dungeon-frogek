@@ -5,7 +5,7 @@ import { storageService } from '../../services/storageService';
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'spawn' | 'battle' | 'treasure' | 'elite' | 'supply' | 'boss';
 type GameFlowState = 'title' | 'playing' | 'paused' | 'ended';
-type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'shielding' | 'dead';
+type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'dead';
 type SoundName =
   | 'swing'
   | 'hit'
@@ -500,6 +500,7 @@ export class DungeonScene extends Phaser.Scene {
 
     if (this.playerActionState === 'dashing') {
       this.updateDashHits();
+      if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.activateShield(time);
     } else {
       this.movePlayer(time);
       if (Phaser.Input.Keyboard.JustDown(this.keys.J)) this.normalAttack(time);
@@ -833,12 +834,9 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private spawnEnemies() {
-    const spots = [
-      [430, 260],
-      [560, 360],
-      [600, 250],
-      [430, 390]
-    ];
+    const spots = this.currentRoom.kind === 'elite'
+      ? [[635, 230], [690, 405], [545, 330], [720, 285]]
+      : [[430, 260], [560, 360], [600, 250], [430, 390]];
     this.currentRoom.enemies.forEach((kind, index) => {
       const base = ENEMIES[kind];
       const [x, y] = kind === 'boss' ? [590, 320] : spots[index] ?? [520, 310];
@@ -866,7 +864,7 @@ export class DungeonScene extends Phaser.Scene {
       const maxHp = eliteBoosted ? Math.ceil(base.maxHp * 1.1) : base.maxHp;
       const atk = eliteBoosted ? Math.ceil(base.atk * 1.15) : base.atk;
       const cooldown = eliteBoosted ? Math.round(base.cooldown / 1.1) : base.cooldown;
-      enemy.stats = { ...base, hp, maxHp, atk, cooldown, id: `${kind}-${index}-${this.currentRoom.id}`, nextAttack: 0 };
+      enemy.stats = { ...base, hp, maxHp, atk, cooldown, id: `${kind}-${index}-${this.currentRoom.id}`, nextAttack: this.time.now + 1000 };
       this.enemies.add(enemy);
       this.createUnitHud(enemy);
     });
@@ -919,7 +917,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private normalAttack(time: number) {
-    if (this.playerActionState !== 'normal') return;
+    if (this.playerActionState === 'dashing' || this.playerActionState === 'dead') return;
     if (time < this.skillCooldowns.attack) return;
     this.playerActionState = 'attacking';
     this.skillCooldowns.attack = time + 330;
@@ -932,7 +930,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private dashSlash(time: number) {
-    if (this.playerActionState !== 'normal') return;
+    if (this.playerActionState === 'dashing' || this.playerActionState === 'dead') return;
     if (time < this.skillCooldowns.dashSlash) {
       this.log('冲刺斩还在冷却。');
       return;
@@ -942,7 +940,6 @@ export class DungeonScene extends Phaser.Scene {
     this.sfx.play('swing');
     this.playerActionState = 'dashing';
     this.dashHitEnemies.clear();
-    this.dashDamageTotal = 0;
     this.dashDamageTotal = 0;
     const startX = this.player.x;
     const startY = this.player.y;
@@ -962,12 +959,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private activateShield(time: number) {
-    if (this.playerActionState === 'dashing' || this.playerActionState === 'attacking') return;
+    if (this.playerActionState === 'dead') return;
     if (time < this.skillCooldowns.shield) {
       this.log('护盾还在冷却。');
       return;
     }
-    this.playerActionState = 'shielding';
     this.skillCooldowns.shield = time + 8000;
     this.shieldUntil = time + 3000;
     this.skillUses += 1;
@@ -979,7 +975,6 @@ export class DungeonScene extends Phaser.Scene {
       if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
       this.shieldRing?.destroy();
       this.shieldRing = undefined;
-      if (this.playerActionState === 'shielding') this.playerActionState = 'normal';
     });
     this.log('护盾启动：3 秒内受到伤害减少 50%。');
   }
@@ -1110,6 +1105,10 @@ export class DungeonScene extends Phaser.Scene {
     this.enemies.getChildren().forEach((object) => {
       const enemy = object as Fighter;
       if (!enemy.active || enemy.getData('dying')) return;
+      if (enemy.getData('attackCharging')) {
+        enemy.setVelocity(0, 0);
+        return;
+      }
       if (!enemy.stats.boss && time < Number(enemy.getData('stunUntil') ?? 0)) {
         enemy.setVelocity(0, 0);
         return;
@@ -1137,8 +1136,8 @@ export class DungeonScene extends Phaser.Scene {
         else enemy.setVelocity(0, 0);
         if (time >= enemy.stats.nextAttack) {
           enemy.stats.nextAttack = time + cooldown;
-          if (enemy.stats.kind === 'archer') this.showRuneArcherCast(enemy);
-          this.fireEnemyProjectile(enemy, false);
+          if (enemy.stats.kind === 'archer') this.startRuneArcherAttack(enemy);
+          else this.fireEnemyProjectile(enemy, false);
         }
         return;
       }
@@ -1146,10 +1145,76 @@ export class DungeonScene extends Phaser.Scene {
       this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
       if (distance <= enemy.stats.range + 18 && time >= enemy.stats.nextAttack) {
         enemy.stats.nextAttack = time + cooldown;
-        if (enemy.stats.kind === 'skeleton') this.showSkeletonAttack(enemy);
-        if (enemy.stats.kind === 'bat') this.showBatAttack(enemy);
-        this.damagePlayer(enemy.stats.atk, enemy.stats.name);
+        if (enemy.stats.kind === 'slime') this.startSlimeAttack(enemy);
+        else if (enemy.stats.kind === 'skeleton') this.startSkeletonAttack(enemy);
+        else if (enemy.stats.kind === 'bat') this.startBatDive(enemy);
+        else this.damagePlayer(enemy.stats.atk, enemy.stats.name);
       }
+    });
+  }
+
+  private startSlimeAttack(enemy: Fighter) {
+    if (enemy.getData('attackCharging')) return;
+    enemy.setData('attackCharging', true);
+    enemy.setVelocity(0, 0);
+    enemy.setTint(0xbffff1);
+    this.tweens.add({ targets: enemy, scaleX: enemy.scaleX * 1.16, scaleY: enemy.scaleY * 1.12, yoyo: true, duration: 125 });
+    this.time.delayedCall(250, () => {
+      if (!enemy.active || enemy.getData('dying')) return;
+      enemy.clearTint();
+      const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 22;
+      if (hit) this.damagePlayer(enemy.stats.atk, '晶化史莱姆撞击', { shakeDuration: 125, shakeIntensity: 0.005 });
+      enemy.setData('stunUntil', this.time.now + 180);
+      this.time.delayedCall(180, () => enemy.active && enemy.setData('attackCharging', false));
+    });
+  }
+
+  private startSkeletonAttack(enemy: Fighter) {
+    if (enemy.getData('attackCharging')) return;
+    enemy.setData('attackCharging', true);
+    enemy.setVelocity(0, 0);
+    enemy.setTexture(this.skeletonAssetKey('attack')).setDisplaySize(44, 52);
+    enemy.setTint(0xf4f0df);
+    this.time.delayedCall(300, () => {
+      if (!enemy.active || enemy.getData('dying')) return;
+      enemy.clearTint();
+      this.showSkeletonAttack(enemy);
+      const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
+      if (hit) this.damagePlayer(enemy.stats.atk, '骷髅守卫挥砍', { shakeDuration: 135, shakeIntensity: 0.006 });
+      this.time.delayedCall(160, () => enemy.active && enemy.setData('attackCharging', false));
+    });
+  }
+
+  private startBatDive(enemy: Fighter) {
+    if (enemy.getData('attackCharging')) return;
+    enemy.setData('attackCharging', true);
+    enemy.setVelocity(0, 0);
+    enemy.setTint(0xd68cff);
+    const angleAway = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+    const retreat = this.getLegalPoint(enemy.x + Math.cos(angleAway) * 18, enemy.y + Math.sin(angleAway) * 18, 22);
+    this.tweens.add({ targets: enemy, x: retreat.x, y: retreat.y, duration: 120, ease: 'Quad.easeOut' });
+    this.time.delayedCall(220, () => {
+      if (!enemy.active || enemy.getData('dying')) return;
+      enemy.clearTint();
+      this.showBatAttack(enemy);
+      const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
+      if (hit) {
+        this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006 });
+        this.knockbackEnemy(enemy, this.player.x, this.player.y, 36, 180);
+      }
+      this.time.delayedCall(180, () => enemy.active && enemy.setData('attackCharging', false));
+    });
+  }
+
+  private startRuneArcherAttack(enemy: Fighter) {
+    if (enemy.getData('attackCharging')) return;
+    enemy.setData('attackCharging', true);
+    enemy.setVelocity(0, 0);
+    this.showRuneArcherCast(enemy);
+    this.time.delayedCall(400, () => {
+      if (!enemy.active || enemy.getData('dying')) return;
+      this.fireEnemyProjectile(enemy, false);
+      this.time.delayedCall(160, () => enemy.active && enemy.setData('attackCharging', false));
     });
   }
 
@@ -1389,7 +1454,7 @@ export class DungeonScene extends Phaser.Scene {
       bullet.setData('handled', false);
       bullet.setData('runeProjectile', isRuneProjectile);
       bullet.setData('guardianProjectile', isBossProjectile);
-      bullet.setData('hitReason', isBossProjectile ? '晶体弹' : '符文弹道');
+      bullet.setData('hitReason', isBossProjectile ? '晶体弹' : '符文弹');
       bullet.setData('bossSkill', isBossProjectile);
       this.bullets.add(bullet);
       const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y) + Phaser.Math.DegToRad(offset);
@@ -1671,7 +1736,7 @@ export class DungeonScene extends Phaser.Scene {
     this.invincibleUntil = this.time.now + (options.invincibleMs ?? 800);
     this.sfx.play('hurt');
     this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
-    this.cameras.main.shake(options.shakeDuration ?? (damage >= 8 ? 165 : 120), options.shakeIntensity ?? (damage >= 8 ? 0.007 : 0.005));
+    this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
     this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? '护盾抵消了部分伤害。' : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
     return true;
@@ -1698,6 +1763,10 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     this.player.setAlpha(1);
+    if (time < this.shieldUntil) {
+      this.player.setTint(0x9ffff0);
+      return;
+    }
     if (time >= this.shieldUntil) this.player.clearTint();
   }
 
@@ -1728,15 +1797,17 @@ export class DungeonScene extends Phaser.Scene {
     item.destroy();
     if (type === 'potion') {
       this.sfx.play('pickup');
-      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + 30);
+      const lowHpBonus = this.player.stats.hp / this.player.stats.maxHp < 0.4 ? 10 : 0;
+      const healAmount = 25 + lowHpBonus;
+      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmount);
       this.itemsObtained.push('小型生命药水');
-      this.showRewardToast('potion_hp', '获得：小型生命药水 HP +30');
-      this.log('获得小型生命药水：回复 30 点生命。按 E 继续。');
+      this.showRewardToast('potion_hp', `获得：小型生命药水 HP +${healAmount}`);
+      this.log(`获得小型生命药水：回复 ${healAmount} 点生命。按 E 继续。`);
       return;
     }
     this.sfx.play('chest');
     this.add.sprite(480, 320, this.assetKey('chest_open')).setDisplaySize(54, 54).setDepth(20).setData('roomObj', true);
-    if (Phaser.Math.Between(0, 1) === 0) {
+    if (Phaser.Math.Between(1, 100) <= 35) {
       this.player.stats.atk += 3;
       this.itemsObtained.push('攻击晶石');
       this.add.sprite(520, 320, this.assetKey('attack_crystal')).setDisplaySize(40, 44).setDepth(20).setData('roomObj', true);
@@ -1785,6 +1856,8 @@ export class DungeonScene extends Phaser.Scene {
   private updateUi(time: number) {
     const dashLeft = Math.max(0, Math.ceil((this.skillCooldowns.dashSlash - time) / 1000));
     const shieldLeft = Math.max(0, Math.ceil((this.skillCooldowns.shield - time) / 1000));
+    const shieldActive = time < this.shieldUntil;
+    const shieldStatus = shieldActive ? '激活中' : shieldLeft === 0 ? '可用' : `冷却 ${shieldLeft} 秒`;
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
@@ -1796,7 +1869,7 @@ export class DungeonScene extends Phaser.Scene {
     this.skillText.setText([
       '[J] 普通攻击',
       `[K] 冲刺斩：${dashLeft === 0 ? '可用' : `冷却 ${dashLeft} 秒`}`,
-      `[L] 护盾：${shieldLeft === 0 ? '可用' : `冷却 ${shieldLeft} 秒`}`
+      `[L] 护盾：${shieldStatus}`
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/6 ${this.currentRoom.name}`,
