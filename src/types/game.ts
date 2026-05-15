@@ -189,6 +189,13 @@ export interface GameRun {
   bossRemainingHpPercent: number;
   deathReason: string;
   score: number;
+  routeSummary?: string;
+  roomCount?: number;
+  eventChoices?: number;
+  eliteRooms?: number;
+  rewardChoices?: number;
+  finalRoomType?: string;
+  reachedBoss?: boolean;
 }
 
 export interface AssetManifest {
