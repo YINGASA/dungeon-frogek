@@ -56,7 +56,7 @@ const ROOMS: RoomDef[] = [
   { id: 'room-1', name: '出生房', kind: 'spawn', description: '灵墟入口，空气里漂浮着发光的晶尘。', enemies: [] },
   { id: 'room-2', name: '普通战斗房', kind: 'battle', description: '晶化史莱姆与骷髅守卫堵住了通道。', enemies: ['slime', 'skeleton'] },
   { id: 'room-3', name: '宝箱房', kind: 'treasure', description: '一只旧宝箱被源晶光芒包裹。', enemies: [], reward: 'chest' },
-  { id: 'room-4', name: '高级战斗房', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'bat', 'archer'] },
+  { id: 'room-4', name: '高级战斗房', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'archer', 'skeleton'] },
   { id: 'room-5', name: '补给房', kind: 'supply', description: '石台上放着一瓶小型生命药水。', enemies: [], reward: 'potion' },
   { id: 'room-6', name: '首领房', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
 ];
@@ -835,7 +835,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private spawnEnemies() {
     const spots = this.currentRoom.kind === 'elite'
-      ? [[635, 230], [690, 405], [545, 330], [720, 285]]
+      ? [[610, 255], [725, 390], [650, 315], [720, 245]]
       : [[430, 260], [560, 360], [600, 250], [430, 390]];
     this.currentRoom.enemies.forEach((kind, index) => {
       const base = ENEMIES[kind];
@@ -1039,11 +1039,24 @@ export class DungeonScene extends Phaser.Scene {
     };
   }
 
+  private keepEnemyInsideRoom(enemy: Fighter, padding = 22) {
+    const legal = this.getLegalPoint(enemy.x, enemy.y, padding);
+    if (legal.x !== enemy.x || legal.y !== enemy.y) {
+      enemy.setPosition(legal.x, legal.y);
+      enemy.setVelocity(0, 0);
+    }
+    if (!enemy.stats.boss && this.doorSprite && Phaser.Math.Distance.Between(enemy.x, enemy.y, this.doorSprite.x, this.doorSprite.y) < 58) {
+      enemy.setX(Math.min(enemy.x, this.currentRoomBounds.right - 74));
+      if ((enemy.body as Phaser.Physics.Arcade.Body).velocity.x > 0) enemy.setVelocityX(0);
+    }
+  }
+
   private knockbackEnemy(enemy: Fighter, sourceX: number, sourceY: number, distance: number, stunMs: number) {
     if (!enemy.active || enemy.stats.boss || enemy.getData('dying')) return;
     const angle = Phaser.Math.Angle.Between(sourceX, sourceY, enemy.x, enemy.y);
     const target = this.getLegalPoint(enemy.x + Math.cos(angle) * distance, enemy.y + Math.sin(angle) * distance, 22);
     enemy.setData('stunUntil', this.time.now + stunMs);
+    enemy.setData('attackCharging', false);
     enemy.setVelocity(0, 0);
     this.tweens.add({
       targets: enemy,
@@ -1107,10 +1120,12 @@ export class DungeonScene extends Phaser.Scene {
       if (!enemy.active || enemy.getData('dying')) return;
       if (enemy.getData('attackCharging')) {
         enemy.setVelocity(0, 0);
+        this.keepEnemyInsideRoom(enemy);
         return;
       }
       if (!enemy.stats.boss && time < Number(enemy.getData('stunUntil') ?? 0)) {
         enemy.setVelocity(0, 0);
+        this.keepEnemyInsideRoom(enemy);
         return;
       }
       const distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
@@ -1132,24 +1147,45 @@ export class DungeonScene extends Phaser.Scene {
 
       if (enemy.stats.ranged) {
         if (distance > enemy.stats.range) this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
-        else if (distance < enemy.stats.range * 0.62) this.physics.moveToObject(enemy, this.player, -enemy.stats.speed);
+        else if (distance < enemy.stats.range * 0.72) this.physics.moveToObject(enemy, this.player, -enemy.stats.speed * 1.08);
         else enemy.setVelocity(0, 0);
         if (time >= enemy.stats.nextAttack) {
           enemy.stats.nextAttack = time + cooldown;
           if (enemy.stats.kind === 'archer') this.startRuneArcherAttack(enemy);
           else this.fireEnemyProjectile(enemy, false);
         }
+        this.keepEnemyInsideRoom(enemy);
         return;
       }
 
-      this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
+      if (enemy.stats.kind === 'skeleton') {
+        const meleeAttackRange = enemy.stats.range + 24;
+        if (distance > meleeAttackRange) {
+          this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
+        } else {
+          enemy.setVelocity(0, 0);
+          if (time >= enemy.stats.nextAttack) {
+            this.startSkeletonAttack(enemy);
+          }
+        }
+        this.keepEnemyInsideRoom(enemy);
+        return;
+      }
+
+      if (enemy.stats.kind === 'bat') {
+        if (distance > enemy.stats.range + 26) this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
+        else enemy.setVelocity(0, 0);
+      } else {
+        if (distance > enemy.stats.range + 10) this.physics.moveToObject(enemy, this.player, enemy.stats.speed);
+        else enemy.setVelocity(0, 0);
+      }
       if (distance <= enemy.stats.range + 18 && time >= enemy.stats.nextAttack) {
         enemy.stats.nextAttack = time + cooldown;
         if (enemy.stats.kind === 'slime') this.startSlimeAttack(enemy);
-        else if (enemy.stats.kind === 'skeleton') this.startSkeletonAttack(enemy);
         else if (enemy.stats.kind === 'bat') this.startBatDive(enemy);
         else this.damagePlayer(enemy.stats.atk, enemy.stats.name);
       }
+      this.keepEnemyInsideRoom(enemy);
     });
   }
 
@@ -1181,7 +1217,11 @@ export class DungeonScene extends Phaser.Scene {
       this.showSkeletonAttack(enemy);
       const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
       if (hit) this.damagePlayer(enemy.stats.atk, '骷髅守卫挥砍', { shakeDuration: 135, shakeIntensity: 0.006 });
-      this.time.delayedCall(160, () => enemy.active && enemy.setData('attackCharging', false));
+      this.time.delayedCall(220, () => {
+        if (!enemy.active || enemy.getData('dying')) return;
+        enemy.stats.nextAttack = this.time.now + enemy.stats.cooldown;
+        enemy.setData('attackCharging', false);
+      });
     });
   }
 
@@ -1191,18 +1231,47 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setVelocity(0, 0);
     enemy.setTint(0xd68cff);
     const angleAway = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-    const retreat = this.getLegalPoint(enemy.x + Math.cos(angleAway) * 18, enemy.y + Math.sin(angleAway) * 18, 22);
+    const retreat = this.getLegalPoint(enemy.x + Math.cos(angleAway) * 28, enemy.y + Math.sin(angleAway) * 28, 22);
     this.tweens.add({ targets: enemy, x: retreat.x, y: retreat.y, duration: 120, ease: 'Quad.easeOut' });
     this.time.delayedCall(220, () => {
       if (!enemy.active || enemy.getData('dying')) return;
       enemy.clearTint();
       this.showBatAttack(enemy);
+      const diveAngle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+      const diveTarget = this.getLegalPoint(enemy.x + Math.cos(diveAngle) * 92, enemy.y + Math.sin(diveAngle) * 92, 22);
+      this.tweens.add({
+        targets: enemy,
+        x: diveTarget.x,
+        y: diveTarget.y,
+        duration: 150,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          if (!enemy.active || enemy.getData('dying')) return;
+          const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 26;
+          if (hit) this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006 });
+          const exit = this.getLegalPoint(enemy.x - Math.cos(diveAngle) * 42, enemy.y - Math.sin(diveAngle) * 42, 22);
+          this.tweens.add({
+            targets: enemy,
+            x: exit.x,
+            y: exit.y,
+            duration: 130,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              if (!enemy.active || enemy.getData('dying')) return;
+              enemy.setData('stunUntil', this.time.now + 120);
+              enemy.setData('attackCharging', false);
+            }
+          });
+        }
+      });
+      if (false) {
       const hit = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y) <= enemy.stats.range + 24;
       if (hit) {
         this.damagePlayer(enemy.stats.atk, '暗影蝙蝠俯冲', { shakeDuration: 130, shakeIntensity: 0.006 });
         this.knockbackEnemy(enemy, this.player.x, this.player.y, 36, 180);
       }
       this.time.delayedCall(180, () => enemy.active && enemy.setData('attackCharging', false));
+      }
     });
   }
 
@@ -1304,7 +1373,7 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('castingVisual', true);
     enemy.setTexture(this.runeArcherAssetKey('cast_1')).setDisplaySize(42, 48);
     const ring = this.add.circle(enemy.x + 16, enemy.y - 4, 18, 0x615bff, 0.12).setStrokeStyle(2, 0x8ffcff, 0.78).setDepth(27);
-    this.tweens.add({ targets: ring, scale: 1.38, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
+    this.tweens.add({ targets: ring, scale: 1.56, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
     this.time.delayedCall(90, () => {
       if (enemy.active && !enemy.getData('dying')) enemy.setTexture(this.runeArcherAssetKey('cast_2')).setDisplaySize(42, 48);
     });
@@ -1488,7 +1557,7 @@ export class DungeonScene extends Phaser.Scene {
       if (Phaser.Math.Distance.Between(projectile.x, projectile.y, this.player.x, this.player.y) > 24) return;
       projectile.setData('handled', true);
       const bossSkill = Boolean(projectile.getData('bossSkill'));
-      this.damagePlayer(Number(projectile.getData('damage')), String(projectile.getData('hitReason') || '符文弹道'), bossSkill
+      this.damagePlayer(Number(projectile.getData('damage')), String(projectile.getData('hitReason') || '符文弹'), bossSkill
         ? { minDamageRatio: 0.7, invincibleMs: 580, shakeDuration: 155, shakeIntensity: 0.007, emphasized: true }
         : undefined);
       this.destroyProjectile(projectile);
