@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="leather" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26344d"/>
+      <stop offset="1" stop-color="#0b101c"/>
+    </linearGradient>
+    <linearGradient id="cape" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#633052"/>
+      <stop offset="1" stop-color="#17111f"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" fill="none"/>
+  
+    <ellipse cx="48" cy="78" rx="24" ry="10" fill="#050812" opacity="0.45"/>
+    <path d="M32 28 Q54 12 71 37 L68 73 Q50 88 30 70 Z" fill="url(#cape)" stroke="#8b4d78" stroke-width="2.4"/>
+    
+    <path d="M45 65 L39 82" stroke="#20293d" stroke-width="7" stroke-linecap="round"/>
+    <path d="M56 64 L62 81" stroke="#20293d" stroke-width="7" stroke-linecap="round"/>
+    <path d="M38 34 Q57 27 66 43 L61 69 Q48 78 34 67 Z" fill="url(#leather)" stroke="#70809f" stroke-width="2.4"/>
+    <circle cx="57" cy="29" r="10.5" fill="#2b3345" stroke="#8394b5" stroke-width="2.2"/>
+    <path d="M62 23 Q53 17 44 25 L59 28 Z" fill="#121927"/>
+    <path d="M59 47 L76 47" stroke="#263147" stroke-width="8" stroke-linecap="round"/>
+    <path d="M39 47 L28 60" stroke="#263147" stroke-width="7" stroke-linecap="round"/>
+    
+  <path d="M53 47 L61 55 L53 64 L45 55 Z" fill="#30f3de" stroke="#d4ffff" stroke-width="2.2" filter="url(#glow)"/>
+  <circle cx="53" cy="55" r="2.3" fill="#ffffff"/>
+    
+  <line x1="74" y1="45" x2="91" y2="30" stroke="#f4f8ff" stroke-width="5" stroke-linecap="round"/>
+  <line x1="74" y1="45" x2="91" y2="30" stroke="#8ffcff" stroke-width="1.5" stroke-linecap="round"/>
+  <rect x="69" y="43" width="10" height="4" rx="2" fill="#b88647"/>
+    
+</svg>

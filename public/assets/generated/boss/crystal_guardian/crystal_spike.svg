@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#39445a"/>
+      <stop offset="0.55" stop-color="#202633"/>
+      <stop offset="1" stop-color="#0b0f18"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#84785f"/>
+      <stop offset="1" stop-color="#342f28"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" fill="none"/>
+  
+  <ellipse cx="32" cy="58" rx="22" ry="6" fill="#040610" opacity="0.5"/>
+  <path d="M32 7 L54 58 L10 58 Z" fill="#5d5bff" stroke="#dbe2ff" stroke-width="3"/>
+  <path d="M32 14 L41 58 L24 58 Z" fill="#ff5fae" opacity="0.72"/>
+  <path d="M18 28 L6 58 L25 58 Z" fill="#302269" stroke="#9c7dff" stroke-width="2"/>
+  <path d="M46 28 L58 58 L39 58 Z" fill="#302269" stroke="#9c7dff" stroke-width="2"/>
+</svg>

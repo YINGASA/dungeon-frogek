@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="112" viewBox="0 0 96 112">
+  <defs>
+    <filter id="eyeGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="armor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8590a4"/>
+      <stop offset="0.48" stop-color="#3b4350"/>
+      <stop offset="1" stop-color="#171d28"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="112" fill="none"/>
+  
+  <ellipse cx="48" cy="95" rx="23" ry="8" fill="#050810" opacity="0.45"/>
+  <path d="M34 42 L62 42 L66 70 Q48 80 30 70 Z" fill="url(#armor)" stroke="#9ba5b6" stroke-width="2.4"/>
+  <rect x="38" y="37" width="20" height="9" rx="4" fill="#d7d2c6" stroke="#7a746a" stroke-width="2"/>
+  <circle cx="52" cy="27" r="15" fill="#d9d5c8" stroke="#7b776d" stroke-width="2.5"/>
+  <path d="M41 24 Q52 16 63 24 L61 37 Q52 43 43 37 Z" fill="#ece8da" opacity="0.78"/>
+  <circle cx="47" cy="27" r="3.4" fill="#16293b"/>
+  <circle cx="57" cy="27" r="3.4" fill="#16293b"/>
+  <circle cx="47" cy="27" r="2" fill="#66d7ff" filter="url(#eyeGlow)"/>
+  <circle cx="57" cy="27" r="2" fill="#66d7ff" filter="url(#eyeGlow)"/>
+  <path d="M48 35 L56 35" stroke="#5d574f" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 48 L23 58" stroke="#d7d2c6" stroke-width="7" stroke-linecap="round"/>
+  <path d="M62 48 L67 52" stroke="#d7d2c6" stroke-width="7" stroke-linecap="round"/>
+  <path d="M35 73 L33 94" stroke="#d7d2c6" stroke-width="7" stroke-linecap="round"/>
+  <path d="M60 73 L63 94" stroke="#d7d2c6" stroke-width="7" stroke-linecap="round"/>
+  <path d="M29 43 L39 55 L31 62" fill="#4a5364" stroke="#9ba5b6" stroke-width="2"/>
+  <path d="M67 43 L57 55 L65 62" fill="#4a5364" stroke="#9ba5b6" stroke-width="2"/>
+  
+  <line x1="65" y1="51" x2="88" y2="36" stroke="#cfd6df" stroke-width="6" stroke-linecap="round"/>
+  <line x1="65" y1="51" x2="88" y2="36" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/>
+  <rect x="60" y="49" width="10" height="4" rx="2" fill="#815f3a"/>
+  <path d="M63 31 Q82 42 88 61" fill="none" stroke="#dbe7ff" stroke-width="5" stroke-linecap="round" opacity="0.72"/>
+  
+</svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <defs>
+    <radialGradient id="body" cx="45%" cy="35%" r="62%">
+      <stop offset="0" stop-color="#c6fff7" stop-opacity="0.94"/>
+      <stop offset="0.45" stop-color="#43e7d1" stop-opacity="0.76"/>
+      <stop offset="1" stop-color="#126d82" stop-opacity="0.9"/>
+    </radialGradient>
+    <filter id="coreGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="96" height="96" fill="none"/>
+  
+  <ellipse cx="48" cy="78" rx="25" ry="8" fill="#031017" opacity="0.46"/>
+  <path d="M20 53
+           C20 33, 33 19, 48 19
+           C64 19, 76 34, 76 54
+           C75 72, 64 74, 48 74
+           C31 74, 20 72, 20 53Z"
+        fill="url(#body)" stroke="#b7fff7" stroke-width="3" opacity="0.94"/>
+  <path d="M27 44 C36 30, 53 28, 66 41" fill="none" stroke="#f0fffb" stroke-width="4" opacity="0.24"/>
+  <path d="M32 43 L48 27 L64 43 L57 64 L39 64 Z"
+        fill="#31f4de" stroke="#e4ffff" stroke-width="2.5" filter="url(#coreGlow)"/>
+  <path d="M48 30 L54 45 L48 61 L42 45 Z" fill="#ffffff" opacity="0.78"/>
+  <circle cx="38" cy="37" r="3.2" fill="#062939"/>
+  <circle cx="59" cy="37" r="3.2" fill="#062939"/>
+  <path d="M38 49 Q48 51 59 48" fill="none" stroke="#062e42" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+  <path d="M22 61 C12 60, 12 70, 26 71" fill="#5bf6e5" opacity="0.32"/>
+  <path d="M74 61 C84 60, 84 70, 70 71" fill="#5bf6e5" opacity="0.32"/>
+  
+</svg>

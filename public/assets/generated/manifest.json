@@ -1,0 +1,52 @@
+{
+  "id": "asset-pack-1778770337980",
+  "theme": "赛博修仙",
+  "artStyle": "pixel",
+  "generatedAt": "2026-05-14T14:52:17.980Z",
+  "sprites": {
+    "tileset": [
+      "/assets/generated/tileset-floor.svg",
+      "/assets/generated/tileset-wall.svg",
+      "/assets/generated/tileset-door.svg",
+      "/assets/generated/tileset-trap.svg",
+      "/assets/generated/tileset-chest.svg",
+      "/assets/generated/tileset-shop.svg",
+      "/assets/generated/tileset-portal.svg",
+      "/assets/generated/tileset-boss-floor.svg"
+    ],
+    "heroes": [
+      "/assets/generated/heroes-knight.svg",
+      "/assets/generated/heroes-mage.svg",
+      "/assets/generated/heroes-ranger.svg"
+    ],
+    "enemies": [
+      "/assets/generated/enemies-goblin.svg",
+      "/assets/generated/enemies-skeleton-archer.svg",
+      "/assets/generated/enemies-slime.svg",
+      "/assets/generated/enemies-cultist.svg",
+      "/assets/generated/enemies-data-demon-boss.svg"
+    ],
+    "skills": [
+      "/assets/generated/skills-slash.svg",
+      "/assets/generated/skills-fireball.svg",
+      "/assets/generated/skills-frost-nova.svg",
+      "/assets/generated/skills-arrow.svg",
+      "/assets/generated/skills-explosion.svg"
+    ],
+    "icons": [
+      "/assets/generated/icons-sword.svg",
+      "/assets/generated/icons-armor.svg",
+      "/assets/generated/icons-potion.svg",
+      "/assets/generated/icons-gold.svg",
+      "/assets/generated/icons-relic.svg"
+    ]
+  },
+  "prompts": [
+    "pixel 赛博修仙 dungeon tileset, readable 2D roguelite style",
+    "pixel hero and enemy sprites with neon dungeon silhouettes"
+  ],
+  "notes": [
+    "方式 A 已生成可用 SVG 资源。",
+    "如需低模渲染，可运行 Blender 脚本生成 PNG。"
+  ]
+}

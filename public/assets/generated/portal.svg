@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">
+<rect width="96" height="96" rx="8" fill="#08111f"/>
+<rect x="12" y="12" width="72" height="72" rx="6" fill="#172033" stroke="#ffb84d" stroke-width="4"/>
+<path d="M20 58 L36 32 L48 54 L62 26 L78 60" fill="none" stroke="#f4fbff" stroke-width="5" stroke-linejoin="round"/>
+<text x="48" y="89" text-anchor="middle" font-family="monospace" font-size="8" fill="#dff7ff">portal</text>
+</svg>

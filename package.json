@@ -1,0 +1,42 @@
+{
+  "name": "ai-dungeon-forgek",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "generate:base-assets": "tsx scripts/generate-assets.ts",
+    "generate:dungeon-assets": "tsx scripts/generate_dungeon_assets.ts",
+    "generate:hunter": "tsx scripts/generate_hunter_assets.ts",
+    "generate:slime": "tsx scripts/generate_crystal_slime_assets.ts",
+    "generate:skeleton": "tsx scripts/generate_skeleton_guard_assets.ts",
+    "generate:bat": "tsx scripts/generate_shadow_bat_assets.ts",
+    "generate:rune": "tsx scripts/generate_rune_archer_assets.ts",
+    "generate:boss": "tsx scripts/generate_crystal_guardian_assets.ts",
+    "generate:assets": "npm run generate:base-assets && npm run generate:dungeon-assets",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "openai": "^4.104.0",
+    "phaser": "^3.90.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3"
+  }
+}
