@@ -796,7 +796,7 @@ export class DungeonScene extends Phaser.Scene {
       roomIndex: index,
       nextOptions: [],
       isCleared: false,
-      rewardClaimed: !template.reward,
+      rewardClaimed: template.kind === 'rest' ? false : !template.reward,
       eventResolved: template.kind !== 'event'
     };
   }
@@ -806,22 +806,61 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private generateDungeonRoute() {
-    const routeKinds: RoomKind[] = ['start', 'battle'];
     const targetLength = Phaser.Math.Between(6, 8);
     const middleSlots = targetLength - 4;
-    const middle: RoomKind[] = ['battle', 'treasure', 'elite'];
-    const optionalPool: RoomKind[] = ['event', 'battle', 'treasure'];
-    if (targetLength === 8) optionalPool.push('elite');
-    while (middle.length < middleSlots) {
-      const candidate = Phaser.Utils.Array.GetRandom(optionalPool);
-      const previous = middle[middle.length - 1];
-      const routePosition = middle.length + 2;
-      if (candidate === 'elite' && routePosition <= 2) continue;
-      if ((candidate === 'event' && previous === 'event') || (candidate === 'treasure' && previous === 'treasure')) continue;
-      if (candidate === 'elite' && middle.filter((kind) => kind === 'elite').length >= (targetLength === 8 ? 2 : 1)) continue;
+    const branchCombos: RoomKind[][] = [
+      ['treasure', 'elite'],
+      ['event', 'battle'],
+      ['rest', 'elite'],
+      ['battle', 'elite'],
+      ['treasure', 'event'],
+      ['battle', 'elite']
+    ];
+    const branchCountTarget = Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1);
+    const middle: RoomKind[] = [];
+
+    const isMiddleLegal = (candidate: RoomKind, list: RoomKind[]) => {
+      const position = list.length + 2;
+      const previous = list[list.length - 1];
+      if (candidate === 'boss' || candidate === 'start') return false;
+      if (candidate === 'elite' && position <= 2) return false;
+      if (candidate === 'elite' && list.filter((kind) => kind === 'elite').length >= (targetLength === 8 ? 2 : 1)) return false;
+      if ((candidate === 'event' && previous === 'event') || (candidate === 'treasure' && previous === 'treasure')) return false;
+      return true;
+    };
+
+    const addKind = (candidate: RoomKind) => {
+      if (middle.length >= middleSlots || !isMiddleLegal(candidate, middle)) return false;
       middle.push(candidate);
+      return true;
+    };
+
+    const shuffledCombos = Phaser.Utils.Array.Shuffle([...branchCombos]);
+    while (middle.length < middleSlots && shuffledCombos.length > 0 && middle.length < branchCountTarget * 2) {
+      const combo = shuffledCombos.shift();
+      if (!combo || middle.length + 2 > middleSlots) continue;
+      const ordered = Phaser.Utils.Array.Shuffle([...combo]);
+      const preview = [...middle];
+      if (ordered.every((kind) => isMiddleLegal(kind, preview) && Boolean(preview.push(kind)))) {
+        ordered.forEach((kind) => middle.push(kind));
+      }
     }
-    routeKinds.push(...middle, 'rest', 'boss');
+
+    const fillerPool: RoomKind[] = ['battle', 'treasure', 'event', 'battle'];
+    if (middleSlots >= 3) fillerPool.push('elite');
+    let guard = 0;
+    while (middle.length < middleSlots && guard < 80) {
+      guard += 1;
+      addKind(Phaser.Utils.Array.GetRandom(fillerPool));
+    }
+    while (middle.length < middleSlots) addKind('battle');
+    if (middleSlots >= 2 && middle[0] === middle[1]) {
+      const alternatives: RoomKind[] = middle[0] === 'battle' ? ['treasure', 'event'] : ['battle'];
+      const replacement = alternatives.find((kind) => isMiddleLegal(kind, [middle[0]]));
+      if (replacement) middle[1] = replacement;
+    }
+
+    const routeKinds: RoomKind[] = ['start', 'battle', ...middle, 'rest', 'boss'];
     const route = routeKinds.map((kind, index) => this.createRouteRoom(this.randomTemplate(kind), index));
     route.forEach((room, index) => {
       room.nextOptions = index < route.length - 1 ? [index + 1] : [];
@@ -831,10 +870,13 @@ export class DungeonScene extends Phaser.Scene {
       .map((room, offset) => ({ room, index: offset + 1 }))
       .filter(({ index }) => {
         if (index + 2 >= route.length - 2 || route[index + 1].kind === route[index + 2].kind) return false;
-        const pair = [route[index + 1].kind, route[index + 2].kind].sort().join('-');
-        return pair !== 'battle-treasure' || Phaser.Math.Between(1, 100) <= 35;
+        const next = route[index + 1];
+        const skip = route[index + 2];
+        if (next.kind === 'event' && skip.kind === 'event') return false;
+        if (next.kind === 'treasure' && skip.kind === 'treasure') return false;
+        return true;
       });
-    const branchCount = Math.min(branchable.length, Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1));
+    const branchCount = Math.min(branchable.length, branchCountTarget);
     Phaser.Utils.Array.Shuffle(branchable).slice(0, branchCount).forEach(({ room, index }) => {
       room.nextOptions = [index + 1, index + 2];
     });
@@ -1004,7 +1046,7 @@ export class DungeonScene extends Phaser.Scene {
     this.currentRoomIndex = index;
     this.currentRoom = this.dungeonRoute[index] ?? this.dungeonRoute[this.dungeonRoute.length - 1];
     if (!this.visitedRoomIds.includes(this.currentRoom.id)) this.visitedRoomIds.push(this.currentRoom.id);
-    this.roomCleared = this.currentRoom.isCleared || (this.currentRoom.enemies.length === 0 && this.currentRoom.kind !== 'treasure' && this.currentRoom.kind !== 'event');
+    this.roomCleared = this.currentRoom.isCleared || (this.currentRoom.enemies.length === 0 && this.currentRoom.kind !== 'treasure' && this.currentRoom.kind !== 'event' && this.currentRoom.kind !== 'rest');
     this.rewardTaken = this.currentRoom.rewardClaimed;
     this.enemies.clear(true, true);
     this.bullets.clear(true, true);
@@ -1017,6 +1059,7 @@ export class DungeonScene extends Phaser.Scene {
     this.roomTitleToast?.destroy();
     this.roomTitleToast = undefined;
     this.children.list.filter((child) => child.getData?.('roomObj')).forEach((child) => child.destroy());
+    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) this.currentRoom.isCleared = false;
     this.drawRoom();
     this.spawnEnemies();
     this.player.setPosition(170, 320);
@@ -1024,7 +1067,10 @@ export class DungeonScene extends Phaser.Scene {
     this.showRoomTitle();
     this.updateDoor();
     if (this.currentRoom.kind === 'boss') this.sfx.play('bossEnter');
-    if (this.currentRoom.kind === 'rest' && this.currentRoom.rewardClaimed) this.openPortal('补给已使用。传送门已开启，按 E 前往首领房。');
+    if (this.currentRoom.kind === 'rest' && this.currentRoom.rewardClaimed) {
+      this.openPortal('补给已使用。传送门已开启，按 E 前往下一房间。');
+      return;
+    }
     if (this.currentRoom.kind === 'event' && !this.currentRoom.eventResolved) this.time.delayedCall(420, () => this.openEventChoice());
     this.log(this.currentRoom.kind === 'start' ? '出生房安全。按 E 进入普通战斗房。' : `${this.currentRoom.name}：${this.currentRoom.description}`);
   }
@@ -1039,7 +1085,7 @@ export class DungeonScene extends Phaser.Scene {
     this.sfx.play('pickup');
     this.showRestUsedEffect();
     this.showFloatingText(this.player.x, this.player.y - 72, healed > 0 ? `恢复 +${healed} HP` : '生命已满', '#8ffcff');
-    this.openPortal(healed > 0 ? `补给房：源晶治疗台恢复了 ${healed} 点生命。` : '补给房：生命已满，传送门已开启。');
+    this.openPortal(healed > 0 ? `补给房：源晶治疗台恢复了 ${healed} 点生命。` : '补给房：生命已满，补给已使用。');
   }
 
   private applyRoomEntryRelics() {
@@ -1105,6 +1151,13 @@ export class DungeonScene extends Phaser.Scene {
       stroke: '#07101e',
       strokeThickness: 3
     }).setOrigin(0.5).setData('roomObj', true).setDepth(82);
+    this.add.text(480, 286, used ? '已使用' : '按 E 使用', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: used ? '#7c91a8' : '#dff7ff',
+      stroke: '#07101e',
+      strokeThickness: 3
+    }).setOrigin(0.5).setData('roomObj', true).setDepth(82);
     if (!used) this.tweens.add({ targets: glow, scale: 1.14, alpha: 0.08, yoyo: true, repeat: -1, duration: 820 });
   }
 
@@ -1113,6 +1166,20 @@ export class DungeonScene extends Phaser.Scene {
       const sprite = item as Phaser.Physics.Arcade.Sprite;
       if (sprite.getData('item') === 'rest') sprite.setTint(0x5b6875).setAlpha(0.55);
     });
+    this.add.text(480, 266, '源晶治疗台（已使用）', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#7c91a8',
+      stroke: '#07101e',
+      strokeThickness: 3
+    }).setOrigin(0.5).setData('roomObj', true).setDepth(83);
+    this.add.text(480, 286, '已使用', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#7c91a8',
+      stroke: '#07101e',
+      strokeThickness: 3
+    }).setOrigin(0.5).setData('roomObj', true).setDepth(83);
     for (let i = 0; i < 8; i += 1) {
       const angle = (Math.PI * 2 * i) / 8;
       const mote = this.add.circle(480, 320, 4, 0x8ffcff, 0.78).setDepth(92);
@@ -2549,7 +2616,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getContextHint() {
-    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) return '源晶治疗台：靠近后按 E 使用';
+    if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) return '源晶治疗台：按 E 使用';
     if (this.roomCleared) return this.currentRoom.nextOptions.length > 1 ? '分支传送门：靠近目标按 E' : '传送门：已开启，按 E 进入';
     if (this.currentRoom.kind === 'treasure') return '传送门：打开宝箱后开启';
     if (this.currentRoom.kind === 'event') return '传送门：完成事件后开启';
@@ -2669,12 +2736,13 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getBranchRouteTag(room: RoomDef) {
-    if (room.kind === 'treasure') return '安全 / 较低收益';
-    if (room.kind === 'battle') return '战斗 / 奖励+金币';
-    if (room.kind === 'elite') return room.name.includes('精英') ? '高风险 / 高收益' : '高压 / 稀有奖励';
-    if (room.kind === 'event') return '事件 / 代价收益';
-    if (room.kind === 'rest') return '恢复 / 安全';
-    if (room.kind === 'boss') return '最终挑战';
+    const kind = room.kind as RoomKind;
+    if (kind === 'treasure') return '安全 / 较低收益';
+    if (kind === 'battle') return '稳定收益';
+    if (kind === 'elite') return room.name.includes('精英') ? '高风险 / 稀有奖励' : '高压 / 更好奖励';
+    if (kind === 'event') return '代价 / 随机收益';
+    if (kind === 'rest') return '恢复';
+    if (kind === 'boss') return '最终挑战';
     return '继续深入';
   }
 
