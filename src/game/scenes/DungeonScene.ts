@@ -4,7 +4,7 @@ import { storageService } from '../../services/storageService';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'start' | 'battle' | 'treasure' | 'event' | 'elite' | 'rest' | 'boss';
-type GameFlowState = 'title' | 'playing' | 'paused' | 'reward' | 'event' | 'ended';
+type GameFlowState = 'title' | 'playing' | 'paused' | 'reward' | 'event' | 'status' | 'ended';
 type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'dead';
 type RewardRarity = 'common' | 'rare' | 'epic';
 type RewardType = '攻击' | '生存' | '回复' | '技能';
@@ -161,8 +161,8 @@ const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
     { name: '裂隙战斗房', kind: 'battle', description: '暗影蝙蝠从裂隙里俯冲而下。', enemies: ['slime', 'bat'] }
   ],
   treasure: [
-    { name: '宝箱房', kind: 'treasure', description: '一只旧宝箱被源晶光芒包裹。', enemies: [], reward: 'chest' },
-    { name: '封尘宝库', kind: 'treasure', description: '封尘石台上摆着一只仍在发亮的宝箱。', enemies: [], reward: 'chest' }
+    { name: '封尘宝库', kind: 'treasure', description: '一座封尘石台上摆着仍在发亮的古旧宝箱。', enemies: [], reward: 'chest' },
+    { name: '封尘宝库', kind: 'treasure', description: '尘封宝库里残留着源晶光芒，古旧宝箱静静等待开启。', enemies: [], reward: 'chest' }
   ],
   event: [
     { name: '随机事件房', kind: 'event', description: '这里的源晶回声让时间变得迟缓。', enemies: [] }
@@ -651,6 +651,7 @@ export class DungeonScene extends Phaser.Scene {
   private hudPanel?: Phaser.GameObjects.Container;
   private titlePanel?: Phaser.GameObjects.Container;
   private pausePanel?: Phaser.GameObjects.Container;
+  private statusPanel?: Phaser.GameObjects.Container;
   private settlementPanel?: Phaser.GameObjects.Container;
   private rewardPanel?: Phaser.GameObjects.Container;
   private eventPanel?: Phaser.GameObjects.Container;
@@ -764,7 +765,7 @@ export class DungeonScene extends Phaser.Scene {
     this.resetRunState();
     this.createTextures();
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,ESC,R,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,I,ESC,R,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.walls = this.physics.add.staticGroup();
@@ -921,6 +922,123 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.resumeAll();
   }
 
+  private showStatusPanel() {
+    if (this.flowState !== 'playing' || this.runEnded) return;
+    this.flowState = 'status';
+    this.physics.world.pause();
+    this.tweens.pauseAll();
+    this.player.setVelocity(0, 0);
+    this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
+    this.statusPanel?.destroy();
+    this.statusPanel = this.add.container(480, 300).setDepth(235);
+    this.statusPanel.add(this.add.rectangle(0, 0, 760, 460, 0x07101e, 0.94).setStrokeStyle(2, 0x35e7c4, 0.92));
+    this.statusPanel.add(this.add.text(0, -205, '当前状态', { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5));
+
+    this.statusPanel.add(this.add.text(-340, -165, '基础属性', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
+    this.statusPanel.add(this.add.text(-340, -137, this.getStatusBasicLines(), {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#dff7ff',
+      lineSpacing: 5,
+      wordWrap: { width: 330 }
+    }));
+
+    this.statusPanel.add(this.add.text(-340, 0, '当前增益', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
+    this.statusPanel.add(this.add.text(-340, 28, this.getStatusBuffLines(), {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#eaffff',
+      lineSpacing: 4,
+      wordWrap: { width: 330 }
+    }));
+
+    this.statusPanel.add(this.add.text(-340, 128, '当前减益', { fontFamily: 'monospace', fontSize: '17px', color: '#ffb0b0' }));
+    this.statusPanel.add(this.add.text(-340, 156, this.getStatusDebuffLines(), {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#ffe0e0',
+      lineSpacing: 4,
+      wordWrap: { width: 330 }
+    }));
+
+    this.statusPanel.add(this.add.text(40, -165, '已获得遗物', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
+    this.statusPanel.add(this.add.text(40, -137, this.getStatusRelicLines(), {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#dff7ff',
+      lineSpacing: 4,
+      wordWrap: { width: 330 }
+    }));
+
+    this.statusPanel.add(this.add.text(40, 128, '最近获得', { fontFamily: 'monospace', fontSize: '17px', color: '#ffe6ad' }));
+    this.statusPanel.add(this.add.text(40, 156, this.getRecentObtainedText(), {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#fff5d6',
+      lineSpacing: 4,
+      wordWrap: { width: 330 }
+    }));
+
+    this.statusPanel.add(this.add.text(0, 204, 'I / Esc 关闭', { fontFamily: 'monospace', fontSize: '15px', color: '#8ffcff' }).setOrigin(0.5));
+  }
+
+  private closeStatusPanel() {
+    if (this.flowState !== 'status') return;
+    this.statusPanel?.destroy();
+    this.statusPanel = undefined;
+    this.flowState = 'playing';
+    this.physics.world.resume();
+    this.tweens.resumeAll();
+  }
+
+  private getStatusBasicLines() {
+    return [
+      `HP：${Math.max(0, Math.ceil(this.player.stats.hp))} / ${this.player.stats.maxHp}`,
+      `ATK：${this.player.stats.atk}`,
+      `DEF：${this.player.stats.def}`,
+      `金币：${this.gold}`,
+      `遗物：${this.relicState.relics.length}`,
+      `当前房间：第 ${this.currentRoomIndex + 1} / ${this.dungeonRoute.length} 房`,
+      `房间类型：${this.getRoomTypeLabel()}`
+    ].join('\n');
+  }
+
+  private getStatusBuffLines() {
+    const buffs: string[] = [];
+    if (this.relicState.temporaryShield > 0) buffs.push(`临时护盾：${this.relicState.temporaryShield}`);
+    if (this.relicState.moveSpeedMultiplier !== 1) buffs.push(`移动速度 +${Math.round((this.relicState.moveSpeedMultiplier - 1) * 100)}%`);
+    if (this.relicState.dashDamageMultiplier !== 1) buffs.push(`冲刺伤害 +${Math.round((this.relicState.dashDamageMultiplier - 1) * 100)}%`);
+    if (this.relicState.dashDistanceMultiplier !== 1) buffs.push(`冲刺距离 +${Math.round((this.relicState.dashDistanceMultiplier - 1) * 100)}%`);
+    if (this.relicState.cooldownReduction > 0) buffs.push(`K / L 冷却缩减 ${Math.round(this.relicState.cooldownReduction * 100)}%`);
+    if (this.relicState.potionHealBonus > 0) buffs.push(`药水回复 +${this.relicState.potionHealBonus}`);
+    if (this.relicState.bonusDamage > 0) buffs.push(`普通攻击额外伤害 +${this.relicState.bonusDamage}`);
+    if (this.relicState.damageReductionFromMinions > 0) buffs.push(`小怪伤害减免 ${Math.round(this.relicState.damageReductionFromMinions * 100)}%`);
+    if (this.player.stats.maxHp > 120) buffs.push(`最大生命提升 +${this.player.stats.maxHp - 120}`);
+    if (this.player.stats.atk > 14) buffs.push(`攻击提升 +${this.player.stats.atk - 14}`);
+    if (this.player.stats.def + this.rustDefensePenalty > 4) buffs.push(`防御提升 +${this.player.stats.def + this.rustDefensePenalty - 4}`);
+    return buffs.length > 0 ? buffs.join('\n') : '暂无增益';
+  }
+
+  private getStatusDebuffLines() {
+    const debuffs: string[] = [];
+    if (this.poisonRooms > 0) debuffs.push(`中毒：剩余 ${this.poisonRooms} 房`);
+    if (this.rustRooms > 0) debuffs.push(`锈蚀：剩余 ${this.rustRooms} 房`);
+    if (this.slowRooms > 0 || this.roomSpeedMultiplier < 1) debuffs.push(`减速：剩余 ${Math.max(this.slowRooms, this.roomSpeedMultiplier < 1 ? 1 : 0)} 房`);
+    return debuffs.length > 0 ? debuffs.join('\n') : '暂无减益';
+  }
+
+  private getStatusRelicLines() {
+    if (this.relicState.relics.length === 0) return '暂无遗物';
+    return this.relicState.relics
+      .map((relic) => `${relic.name}｜${relic.rarity.toUpperCase()}｜${relic.effectText}`)
+      .join('\n');
+  }
+
+  private getRecentObtainedText() {
+    const recent = this.itemsObtained.slice(-3);
+    return recent.length > 0 ? recent.join(' / ') : '暂无记录';
+  }
+
   private restartRun() {
     this.pausePanel?.destroy();
     this.time.paused = false;
@@ -961,6 +1079,10 @@ export class DungeonScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
       return;
     }
+    if (this.flowState === 'status') {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.I) || Phaser.Input.Keyboard.JustDown(this.keys.ESC)) this.closeStatusPanel();
+      return;
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
       if (this.flowState === 'reward' || this.flowState === 'event') return;
       if (this.flowState === 'paused') this.resumeGame();
@@ -978,6 +1100,11 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.flowState === 'paused') return;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.I)) {
+      if (this.hitStopActive) return;
+      this.showStatusPanel();
+      return;
+    }
     if (this.hitStopActive) {
       if (time >= this.pendingHitStopUntil) this.endHitStop();
       else return;
@@ -1004,7 +1131,7 @@ export class DungeonScene extends Phaser.Scene {
         this.grantEventCombatClearBonus();
         this.openPortal('伏击已清理。传送门已开启，按 E 进入下一房间。');
       } else {
-        this.openPortal(`${this.currentRoom.name} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
+        this.openPortal(`${this.getRoomDisplayName()} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
       }
     }
     this.updateInvincibleVisual(time);
@@ -1215,6 +1342,22 @@ export class DungeonScene extends Phaser.Scene {
     return entries[0][0];
   }
 
+  private getRoomDisplayName(room: RoomDef = this.currentRoom) {
+    if (room.kind === 'treasure') return '封尘宝库';
+    return room.name;
+  }
+
+  private getRoomTypeLabel(room: RoomDef = this.currentRoom) {
+    if (room.kind === 'start') return '出生房';
+    if (room.kind === 'battle') return '普通战斗房';
+    if (room.kind === 'elite') return room.name.includes('精英') ? '精英战斗房' : '高级战斗房';
+    if (room.kind === 'treasure') return '封尘宝库';
+    if (room.kind === 'event') return '事件房';
+    if (room.kind === 'boss') return '首领房';
+    if (room.kind === 'rest') return '补给房';
+    return room.name;
+  }
+
   private createDefaultRelicState(): PlayerRelicState {
     return {
       moveSpeedMultiplier: 1,
@@ -1281,6 +1424,8 @@ export class DungeonScene extends Phaser.Scene {
     this.activeRewardChoices = [];
     this.rewardPanel?.destroy();
     this.rewardPanel = undefined;
+    this.statusPanel?.destroy();
+    this.statusPanel = undefined;
     this.lastFacing = new Phaser.Math.Vector2(1, 0);
     this.playerDirection = 'down';
     this.playerWalkFrame = 'idle';
@@ -1424,7 +1569,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.currentRoom.kind === 'event' && !this.currentRoom.eventResolved) this.time.delayedCall(420, () => this.openEventChoice());
-    this.log(this.currentRoom.kind === 'start' ? '出生房安全。按 E 进入普通战斗房。' : `${this.currentRoom.name}：${this.currentRoom.description}`);
+    this.log(this.currentRoom.kind === 'start' ? '出生房安全。按 E 进入普通战斗房。' : `${this.getRoomDisplayName()}：${this.currentRoom.description}`);
   }
 
   private claimRestRoomSupply() {
@@ -2733,7 +2878,7 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardPanel?.destroy();
     this.rewardPanel = this.add.container(480, 300).setDepth(230);
     this.rewardPanel.add(this.add.rectangle(0, 0, 720, 360, 0x07101e, 0.97).setStrokeStyle(2, 0x35e7c4, 0.92));
-    this.rewardPanel.add(this.add.text(0, -145, trigger === 'elite' ? '高级战斗奖励' : trigger === 'treasure' ? '宝箱奖励' : '战斗奖励', {
+    this.rewardPanel.add(this.add.text(0, -145, trigger === 'elite' ? '高级战斗奖励' : trigger === 'treasure' ? '封尘宝库奖励' : '战斗奖励', {
       fontFamily: 'monospace',
       fontSize: '28px',
       color: '#ffffff'
@@ -2984,7 +3129,7 @@ export class DungeonScene extends Phaser.Scene {
         this.pickItem(item);
         return;
       }
-      this.log(this.currentRoom.reward === 'chest' ? '靠近宝箱按 E 打开。' : '靠近药水按 E 拾取。');
+      this.log(this.currentRoom.reward === 'chest' ? '靠近封尘宝库中的宝箱，按 E 打开。' : '靠近药水按 E 拾取。');
       return;
     }
     if (!this.roomCleared) {
@@ -3091,10 +3236,12 @@ export class DungeonScene extends Phaser.Scene {
     this.skillText.setText([
       '[J] Attack',
       `[K] Dash Slash: ${dashLeft === 0 ? 'Ready' : `CD ${dashLeft}s`}`,
-      `[L] Shield: ${shieldStatus}`
+      `[L] Shield: ${shieldStatus}`,
+      '[I] 查看状态',
+      '[E] 互动  [Esc] 暂停  [R] 重开'
     ]);
     this.roomText.setText([
-      `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.currentRoom.name}`,
+      `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.getRoomDisplayName()}`,
       this.getContextHint(),
       this.getNearbyBranchHint(),
     ].filter(Boolean));
@@ -3109,7 +3256,7 @@ export class DungeonScene extends Phaser.Scene {
   private getContextHint() {
     if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) return '源晶治疗台：按 E 使用';
     if (this.roomCleared) return this.currentRoom.nextOptions.length > 1 ? '分支传送门：靠近目标按 E' : '传送门：已开启，按 E 进入';
-    if (this.currentRoom.kind === 'treasure') return '传送门：打开宝箱后开启';
+    if (this.currentRoom.kind === 'treasure') return '传送门：打开封尘宝库后开启';
     if (this.currentRoom.kind === 'event') return '传送门：完成事件后开启';
     return '传送门：清除敌人后开启';
   }
@@ -3121,14 +3268,14 @@ export class DungeonScene extends Phaser.Scene {
       .sort((a, b) => a.distance - b.distance)[0];
     if (!nearest || nearest.distance > 110) return '';
     const target = this.dungeonRoute[this.currentRoom.nextOptions[nearest.index]];
-    return `按 E 前往：${target.name}`;
+    return `按 E 前往：${this.getRoomDisplayName(target)}`;
   }
 
   private showRoomTitle() {
     this.roomTitleToast?.destroy();
     const title = this.currentRoom.kind === 'boss'
       ? `第 ${this.currentRoomIndex + 1}/${this.dungeonRoute.length} 房：首领房：晶核守卫`
-      : `第 ${this.currentRoomIndex + 1}/${this.dungeonRoute.length} 房：${this.currentRoom.name}`;
+      : `第 ${this.currentRoomIndex + 1}/${this.dungeonRoute.length} 房：${this.getRoomDisplayName()}`;
     this.roomTitleToast = this.add.text(480, 300, title, {
       fontFamily: 'monospace',
       fontSize: this.currentRoom.kind === 'boss' ? '30px' : '28px',
@@ -3200,7 +3347,7 @@ export class DungeonScene extends Phaser.Scene {
       const sprite = this.add.image(x, y, this.assetKey(this.roomCleared ? 'door_open' : 'door_closed')).setDisplaySize(44, 84).setData('roomObj', true).setDepth(7);
       sprite.setAlpha(this.roomCleared ? 1 : 0.52).setTint(this.roomCleared ? 0xbaffff : 0x40536a);
       const bg = this.add.rectangle(x - 104, y - 54, 142, 28, 0x07101e, 0.78).setStrokeStyle(1, this.roomCleared ? 0x8ffcff : 0x506070).setData('roomObj', true).setDepth(80);
-      const label = this.add.text(x - 104, y - 55, targetRoom.name, {
+      const label = this.add.text(x - 104, y - 55, this.getRoomDisplayName(targetRoom), {
         fontFamily: 'monospace',
         fontSize: '13px',
         color: this.roomCleared ? '#dff7ff' : '#7c91a8',
@@ -3318,7 +3465,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private getRouteSummary(visitedOnly = false) {
     const rooms = visitedOnly ? this.getVisitedRooms() : this.dungeonRoute;
-    return rooms.map((room) => room.name).join(' → ');
+    return rooms.map((room) => this.getRoomDisplayName(room)).join(' → ');
   }
 
   private getEliteRoomsVisited() {
@@ -3343,6 +3490,8 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardPanel = undefined;
     this.eventPanel?.destroy();
     this.eventPanel = undefined;
+    this.statusPanel?.destroy();
+    this.statusPanel = undefined;
     this.roomText.setVisible(false);
     const endedAt = Date.now();
     const durationSeconds = Math.round((endedAt - this.startedAt) / 1000);
