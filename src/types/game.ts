@@ -196,6 +196,10 @@ export interface GameRun {
   rewardChoices?: number;
   finalRoomType?: string;
   reachedBoss?: boolean;
+  negativeEvents?: number;
+  combatEvents?: number;
+  wasPoisoned?: boolean;
+  wasCursed?: boolean;
 }
 
 export interface AssetManifest {

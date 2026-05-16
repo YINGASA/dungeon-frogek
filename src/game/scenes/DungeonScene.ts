@@ -101,6 +101,55 @@ interface DungeonEventDef {
   options: DungeonEventOption[];
 }
 
+type EventCategory = 'benefit' | 'penalty' | 'combat' | 'mixed' | 'supply' | 'curse';
+type EventEffectType =
+  | 'spike'
+  | 'collapse'
+  | 'poison'
+  | 'rust'
+  | 'attack'
+  | 'defense'
+  | 'gold'
+  | 'heal'
+  | 'cleanse'
+  | 'ambush'
+  | 'elite-patrol'
+  | 'unstable-crystal';
+
+interface EventPackDef {
+  id: string;
+  title: string;
+  description: string;
+  category: EventCategory;
+  rarity: RewardRarity;
+  weight: number;
+  effectType: EventEffectType;
+  effectText: string;
+  followUpObjective: string;
+  roomTags: RoomKind[];
+  minRoomIndex?: number;
+  maxRoomIndex?: number;
+  oncePerRun?: boolean;
+  applyEffect: (scene: DungeonScene) => EventResult;
+}
+
+interface EventResult {
+  log: string;
+  floatingText?: string;
+  opensPortal?: boolean;
+  enemies?: EnemyKind[];
+  goldReward?: number;
+  rareRewardChance?: number;
+}
+
+interface EventRunStats {
+  triggered: number;
+  negative: number;
+  combat: number;
+  poisoned: boolean;
+  cursed: boolean;
+}
+
 const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
   start: [
     { name: '出生房', kind: 'start', description: '灵墟入口，空气里漂浮着发光的晶尘。', enemies: [] }
@@ -195,6 +244,259 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
       { text: '搜索护甲，获得 DEF +1', canChoose: () => true, apply: (scene) => { scene.player.stats.def += 1; return '找到护甲残片，DEF +1。'; } },
       { text: '离开', canChoose: () => true, apply: () => '你离开了武器架。' }
     ]
+  }
+];
+
+const EVENT_PACK: EventPackDef[] = [
+  {
+    id: 'spike-trap',
+    title: '尖刺陷阱',
+    description: '石缝里弹出一排隐藏尖刺，寒光贴着护甲划过。',
+    category: 'penalty',
+    rarity: 'common',
+    weight: 12,
+    effectType: 'spike',
+    effectText: '受到 10-16 点伤害，最低保留 1 HP。',
+    followUpObjective: '通道会在陷阱停止后开启。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const damage = Phaser.Math.Between(10, 16);
+      scene.applySafeEventDamage(damage, '尖刺陷阱');
+      return {
+        log: `尖刺陷阱刺穿护甲，造成 ${damage} 点伤害。`,
+        floatingText: `尖刺陷阱 -${damage} HP`,
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'collapsing-floor',
+    title: '塌陷地面',
+    description: '脚下石板突然崩裂，碎石滚落进漆黑裂隙。',
+    category: 'penalty',
+    rarity: 'common',
+    weight: 10,
+    effectType: 'collapse',
+    effectText: '受到 8-12 点伤害，下一房间移动速度降低 8%。',
+    followUpObjective: '带着碎石拖累继续前进。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const damage = Phaser.Math.Between(8, 12);
+      scene.applySafeEventDamage(damage, '塌陷地面');
+      scene.applyNextRoomSlow();
+      return {
+        log: '地面塌陷，碎石拖慢了你的脚步。',
+        floatingText: `塌陷 -${damage} HP / 下房减速`,
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'toxic-fog',
+    title: '污染毒雾',
+    description: '绿色雾气从破裂源晶中渗出，顺着呼吸侵入体内。',
+    category: 'curse',
+    rarity: 'common',
+    weight: 9,
+    effectType: 'poison',
+    effectText: '获得中毒 2 房；每进入新房扣 4 HP，最低保留 1 HP。',
+    followUpObjective: '寻找净化或撑过接下来的房间。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      scene.applyPoison(2);
+      return {
+        log: '污染毒雾侵入体内，接下来 2 个房间会持续损伤生命。',
+        floatingText: '中毒 2 房',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'rust-curse',
+    title: '锈蚀诅咒',
+    description: '铁锈色符文爬上护甲，防护层发出细碎裂响。',
+    category: 'curse',
+    rarity: 'common',
+    weight: 9,
+    effectType: 'rust',
+    effectText: '接下来 2 个房间 DEF -1，不会低于 0。',
+    followUpObjective: '诅咒结束后护甲会恢复。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      scene.applyRust(2);
+      return {
+        log: '锈蚀诅咒削弱了你的护甲。',
+        floatingText: '锈蚀 2 房',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'broken-weapon-rack',
+    title: '破损武器架',
+    description: '倒塌的武器架里还有一把能用的源晶短刃。',
+    category: 'benefit',
+    rarity: 'common',
+    weight: 14,
+    effectType: 'attack',
+    effectText: '获得 ATK +2。',
+    followUpObjective: '整理武器后继续前进。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      scene.player.stats.atk += 2;
+      return {
+        log: '你从破损武器架中找到可用武器，ATK +2。',
+        floatingText: 'ATK +2',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'abandoned-armor-box',
+    title: '废弃护甲箱',
+    description: '一只旧箱子半埋在灰尘里，里面留着还能装配的护甲片。',
+    category: 'benefit',
+    rarity: 'common',
+    weight: 12,
+    effectType: 'defense',
+    effectText: '获得 DEF +1。',
+    followUpObjective: '装好护甲后继续前进。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      scene.player.stats.def += 1;
+      return {
+        log: '你找到一块还能使用的护甲片，DEF +1。',
+        floatingText: 'DEF +1',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'lost-coin-pouch',
+    title: '遗失钱袋',
+    description: '墙角散着一只旧钱袋，几枚金币还带着微弱温度。',
+    category: 'benefit',
+    rarity: 'common',
+    weight: 13,
+    effectType: 'gold',
+    effectText: '获得 15-30 金币。',
+    followUpObjective: '收起金币后通道开启。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const gold = Phaser.Math.Between(15, 30);
+      scene.gold += gold;
+      return {
+        log: '你发现了遗失的钱袋。',
+        floatingText: `金币 +${gold}`,
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'source-healing-spring',
+    title: '源晶治疗泉',
+    description: '一眼源晶泉水仍未被完全污染，清亮的光晕缓慢荡开。',
+    category: 'supply',
+    rarity: 'rare',
+    weight: 8,
+    effectType: 'heal',
+    effectText: '回复 20-30 HP；低于 35% HP 时额外回复 10 HP。',
+    followUpObjective: '恢复后继续深入。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const baseHeal = Phaser.Math.Between(20, 30);
+      const lowHpBonus = scene.player.stats.hp / scene.player.stats.maxHp < 0.35 ? 10 : 0;
+      const healed = scene.healPlayer(baseHeal + lowHpBonus);
+      return {
+        log: '源晶治疗泉恢复了你的生命。',
+        floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'purifying-light',
+    title: '净化之光',
+    description: '一束洁白源光穿过穹顶裂缝，短暂压住了污染回声。',
+    category: 'supply',
+    rarity: 'rare',
+    weight: 7,
+    effectType: 'cleanse',
+    effectText: '清除中毒或锈蚀；若没有异常状态，获得 10 点临时护盾。',
+    followUpObjective: '净化完成后通道开启。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const cleansed = scene.cleanseNegativeStatuses();
+      if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 10);
+      return {
+        log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 10 点临时护盾。',
+        floatingText: cleansed ? '异常状态已清除' : 'Shield 10',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'monster-ambush',
+    title: '怪物伏击',
+    description: '脚步声从墙后同时响起，通道被突然落下的石门封锁。',
+    category: 'combat',
+    rarity: 'common',
+    weight: 10,
+    effectType: 'ambush',
+    effectText: '生成一小波普通怪；清完后开启传送门。',
+    followUpObjective: '击败伏击怪物。',
+    roomTags: ['event'],
+    applyEffect: () => ({
+      log: '你误入怪物伏击，通道被封锁了！',
+      floatingText: '怪物伏击',
+      enemies: ['slime', 'skeleton'],
+      goldReward: 6,
+      opensPortal: false
+    })
+  },
+  {
+    id: 'elite-patrol',
+    title: '精英巡逻',
+    description: '带着源晶徽记的巡逻队从阴影中逼近，精英守卫已经锁定你。',
+    category: 'combat',
+    rarity: 'rare',
+    weight: 3,
+    effectType: 'elite-patrol',
+    effectText: '生成 1 个精英怪和 1 个普通怪；清完后给少量金币，低概率给 rare 奖励。',
+    followUpObjective: '击败精英巡逻队。',
+    roomTags: ['event'],
+    minRoomIndex: 3,
+    oncePerRun: true,
+    applyEffect: () => ({
+      log: '精英巡逻队发现了你！',
+      floatingText: '精英巡逻',
+      enemies: ['skeleton', 'archer'],
+      goldReward: 12,
+      rareRewardChance: 18,
+      opensPortal: false
+    })
+  },
+  {
+    id: 'unstable-crystal',
+    title: '不稳定源晶',
+    description: '裂纹源晶在掌心震颤，危险能量和可用力量同时溢出。',
+    category: 'mixed',
+    rarity: 'rare',
+    weight: 6,
+    effectType: 'unstable-crystal',
+    effectText: '受到 8 点伤害，并获得随机 common 或 rare 奖励。',
+    followUpObjective: '吸收残余能量后继续前进。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      scene.applySafeEventDamage(8, '不稳定源晶');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 70 ? 'common' : 'rare', []);
+      if (reward) scene.grantReward(reward);
+      return {
+        log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${reward.name}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
+        floatingText: reward ? `-${8} HP / ${reward.name}` : '-8 HP',
+        opensPortal: true
+      };
+    }
   }
 ];
 
@@ -332,7 +634,7 @@ export class DungeonScene extends Phaser.Scene {
   private rewardPanel?: Phaser.GameObjects.Container;
   private eventPanel?: Phaser.GameObjects.Container;
   private activeRewardChoices: RewardOption[] = [];
-  private activeEvent?: DungeonEventDef;
+  private activeEvent?: EventPackDef;
   private doorSprite?: Phaser.GameObjects.Image;
   private doorTween?: Phaser.Tweens.Tween;
   private branchDoorSprites: Phaser.GameObjects.Image[] = [];
@@ -372,6 +674,15 @@ export class DungeonScene extends Phaser.Scene {
   private reachedBossPhaseTwo = false;
   private itemsObtained: string[] = [];
   private eventChoiceCount = 0;
+  private eventStats: EventRunStats = this.createDefaultEventStats();
+  private eventsSeen = new Set<string>();
+  private poisonRooms = 0;
+  private rustRooms = 0;
+  private rustDefensePenalty = 0;
+  private slowRooms = 0;
+  private roomSpeedMultiplier = 1;
+  private eventCombatGoldReward = 0;
+  private eventCombatRareRewardChance = 0;
   private rewardChoiceCount = 0;
   public relicState: PlayerRelicState = this.createDefaultRelicState();
   private epicRewardsTaken = 0;
@@ -642,9 +953,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.flowState === 'event') {
-      if (Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.chooseEventOption(0);
-      if (Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.chooseEventOption(1);
-      if (Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.chooseEventOption(2);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.E) || Phaser.Input.Keyboard.JustDown(this.cursors.space)) this.resolveActiveEvent();
       return;
     }
     if (this.flowState === 'paused') return;
@@ -670,6 +979,9 @@ export class DungeonScene extends Phaser.Scene {
     if (!this.roomCleared && this.currentRoom.enemies.length > 0 && this.countLivingEnemies() === 0) {
       if (this.currentRoom.kind === 'battle' || this.currentRoom.kind === 'elite') {
         this.openRewardChoice(this.currentRoom.kind);
+      } else if (this.currentRoom.kind === 'event') {
+        this.grantEventCombatClearBonus();
+        this.openPortal('伏击已清理。传送门已开启，按 E 进入下一房间。');
       } else {
         this.openPortal(`${this.currentRoom.name} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
       }
@@ -860,7 +1172,19 @@ export class DungeonScene extends Phaser.Scene {
       if (replacement) middle[1] = replacement;
     }
 
-    const routeKinds: RoomKind[] = ['start', 'battle', ...middle, 'rest', 'boss'];
+    let preBossKind = this.pickWeightedRoomKind([
+      ['rest', 30],
+      ['event', 25],
+      ['treasure', 20],
+      ['battle', 15],
+      ['elite', 10]
+    ]);
+    const previousKind = middle[middle.length - 1] ?? 'battle';
+    if ((preBossKind === 'battle' || preBossKind === 'elite') && previousKind === 'elite' && Phaser.Math.Between(1, 100) <= 75) {
+      preBossKind = Phaser.Utils.Array.GetRandom(['rest', 'event', 'treasure'] as RoomKind[]);
+    }
+
+    const routeKinds: RoomKind[] = ['start', 'battle', ...middle, preBossKind, 'boss'];
     const route = routeKinds.map((kind, index) => this.createRouteRoom(this.randomTemplate(kind), index));
     route.forEach((room, index) => {
       room.nextOptions = index < route.length - 1 ? [index + 1] : [];
@@ -883,6 +1207,16 @@ export class DungeonScene extends Phaser.Scene {
     return route;
   }
 
+  private pickWeightedRoomKind(entries: Array<[RoomKind, number]>) {
+    const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+    let roll = Phaser.Math.Between(1, total);
+    for (const [kind, weight] of entries) {
+      roll -= weight;
+      if (roll <= 0) return kind;
+    }
+    return entries[0][0];
+  }
+
   private createDefaultRelicState(): PlayerRelicState {
     return {
       moveSpeedMultiplier: 1,
@@ -896,6 +1230,16 @@ export class DungeonScene extends Phaser.Scene {
       damageReductionFromMinions: 0,
       bossRoomHealUsed: false,
       dashCooldownRefunded: false
+    };
+  }
+
+  private createDefaultEventStats(): EventRunStats {
+    return {
+      triggered: 0,
+      negative: 0,
+      combat: 0,
+      poisoned: false,
+      cursed: false
     };
   }
 
@@ -925,6 +1269,15 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardChoiceCount = 0;
     this.reachedBossPhaseTwo = false;
     this.itemsObtained = [];
+    this.eventStats = this.createDefaultEventStats();
+    this.eventsSeen.clear();
+    this.poisonRooms = 0;
+    this.rustRooms = 0;
+    this.rustDefensePenalty = 0;
+    this.slowRooms = 0;
+    this.roomSpeedMultiplier = 1;
+    this.eventCombatGoldReward = 0;
+    this.eventCombatRareRewardChance = 0;
     this.relicState = this.createDefaultRelicState();
     this.epicRewardsTaken = 0;
     this.activeRewardChoices = [];
@@ -1063,6 +1416,7 @@ export class DungeonScene extends Phaser.Scene {
     this.drawRoom();
     this.spawnEnemies();
     this.player.setPosition(170, 320);
+    this.applyRoomEntryStatuses();
     this.applyRoomEntryRelics();
     this.showRoomTitle();
     this.updateDoor();
@@ -1099,6 +1453,75 @@ export class DungeonScene extends Phaser.Scene {
       this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 HP +20', '#d6b4ff');
       this.log('源泉残响触发：进入 Boss 房回复 20 HP。');
     }
+  }
+
+  private applyRoomEntryStatuses() {
+    this.roomSpeedMultiplier = 1;
+    if (this.currentRoomIndex <= 0) return;
+
+    if (this.poisonRooms > 0) {
+      this.applySafeEventDamage(4, '中毒');
+      this.poisonRooms = Math.max(0, this.poisonRooms - 1);
+      this.showFloatingText(this.player.x, this.player.y - 92, '中毒 -4 HP', '#9bff7a');
+      this.log(`中毒发作，损失 4 HP。剩余 ${this.poisonRooms} 房。`);
+    }
+
+    if (this.rustRooms > 0) {
+      this.rustRooms = Math.max(0, this.rustRooms - 1);
+      if (this.rustRooms === 0) this.restoreRustDefense();
+    }
+
+    if (this.slowRooms > 0) {
+      this.roomSpeedMultiplier = 0.92;
+      this.slowRooms = Math.max(0, this.slowRooms - 1);
+      this.showFloatingText(this.player.x, this.player.y - 112, '碎石拖慢脚步', '#ffe6ad');
+      this.log('碎石拖慢了你的脚步，本房间移动速度降低 8%。');
+    }
+  }
+
+  public applySafeEventDamage(amount: number, reason: string) {
+    const damage = Math.min(amount, Math.max(0, this.player.stats.hp - 1));
+    this.player.stats.hp = Math.max(1, this.player.stats.hp - damage);
+    this.damageTaken += damage;
+    this.sfx.play('hurt');
+    if (damage > 0) this.showDamageNumber(this.player.x, this.player.y - 34, damage, '#ff8aa8', true);
+    this.cameras.main.shake(120, 0.004);
+    this.log(`${reason}造成 ${damage} 点伤害。`);
+    return damage;
+  }
+
+  public applyNextRoomSlow() {
+    this.slowRooms = 1;
+  }
+
+  public applyPoison(rooms: number) {
+    this.poisonRooms = Math.max(this.poisonRooms, rooms);
+    this.eventStats.poisoned = true;
+  }
+
+  public applyRust(rooms: number) {
+    this.rustRooms = Math.max(this.rustRooms, rooms);
+    this.eventStats.cursed = true;
+    if (this.rustDefensePenalty > 0) return;
+    const penalty = Math.min(1, this.player.stats.def);
+    this.rustDefensePenalty = penalty;
+    this.player.stats.def = Math.max(0, this.player.stats.def - penalty);
+  }
+
+  private restoreRustDefense() {
+    if (this.rustDefensePenalty <= 0) return;
+    this.player.stats.def += this.rustDefensePenalty;
+    this.rustDefensePenalty = 0;
+    this.showFloatingText(this.player.x, this.player.y - 92, '锈蚀解除', '#8ffcff');
+    this.log('锈蚀诅咒消退，护甲恢复。');
+  }
+
+  public cleanseNegativeStatuses() {
+    const hadStatus = this.poisonRooms > 0 || this.rustRooms > 0 || this.rustDefensePenalty > 0;
+    this.poisonRooms = 0;
+    this.rustRooms = 0;
+    this.restoreRustDefense();
+    return hadStatus;
   }
 
   private drawRoom() {
@@ -1237,7 +1660,7 @@ export class DungeonScene extends Phaser.Scene {
           .setData('shockCharging', false)
           .setData('nextSpike', this.time.now + 2200);
       }
-      const trueElite = this.currentRoom.name.includes('精英') && kind !== 'boss';
+      const trueElite = (this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳') || (this.currentRoom.kind === 'event' && this.eventCombatRareRewardChance > 0 && index === 0)) && kind !== 'boss';
       const eliteBoosted = this.currentRoom.kind === 'elite' && kind !== 'boss';
       const hp = trueElite ? Math.ceil(base.hp * 1.25) : eliteBoosted ? Math.ceil(base.hp * 1.1) : base.hp;
       const maxHp = trueElite ? Math.ceil(base.maxHp * 1.25) : eliteBoosted ? Math.ceil(base.maxHp * 1.1) : base.maxHp;
@@ -1271,7 +1694,7 @@ export class DungeonScene extends Phaser.Scene {
         if (this.hasGeneratedHunter(this.playerDirection, 'idle')) this.player.setRotation(0);
       }
     }
-    const speed = this.player.stats.speed * this.relicState.moveSpeedMultiplier;
+    const speed = this.player.stats.speed * this.relicState.moveSpeedMultiplier * this.roomSpeedMultiplier;
     this.player.setVelocity(direction.x * speed, direction.y * speed);
   }
 
@@ -2281,6 +2704,25 @@ export class DungeonScene extends Phaser.Scene {
     this.log(message);
   }
 
+  private grantEventCombatClearBonus() {
+    if (this.eventCombatGoldReward > 0) {
+      this.gold += this.eventCombatGoldReward;
+      this.showFloatingText(this.player.x, this.player.y - 82, `金币 +${this.eventCombatGoldReward}`, '#ffe6ad');
+      this.log(`事件战斗奖励：获得 ${this.eventCombatGoldReward} 金币。`);
+    }
+    if (this.eventCombatRareRewardChance > 0 && Phaser.Math.Between(1, 100) <= this.eventCombatRareRewardChance) {
+      const reward = this.pickRewardByRarity('rare', []);
+      if (reward) {
+        this.grantReward(reward);
+        this.showRewardParticles('rare');
+        this.showFloatingText(this.player.x, this.player.y - 106, `获得：${reward.name}`, '#8ffcff');
+        this.log(`精英巡逻掉落：${reward.name}。`);
+      }
+    }
+    this.eventCombatGoldReward = 0;
+    this.eventCombatRareRewardChance = 0;
+  }
+
   private openRewardChoice(trigger: RewardTrigger) {
     if (this.flowState === 'reward' || this.runEnded) return;
     this.roomCleared = false;
@@ -2433,54 +2875,101 @@ export class DungeonScene extends Phaser.Scene {
     this.player.setVelocity(0, 0);
     this.physics.world.pause();
     this.flowState = 'event';
-    this.activeEvent = Phaser.Utils.Array.GetRandom(DUNGEON_EVENTS);
+    this.activeEvent = this.pickEventPackEvent();
     this.eventPanel?.destroy();
     this.eventPanel = this.add.container(480, 300).setDepth(232);
-    this.eventPanel.add(this.add.rectangle(0, 0, 690, 330, 0x07101e, 0.97).setStrokeStyle(2, 0xb87cff, 0.9));
-    this.eventPanel.add(this.add.text(0, -128, this.activeEvent.title, { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5));
-    this.eventPanel.add(this.add.text(-290, -88, this.activeEvent.description, {
+    this.eventPanel.add(this.add.rectangle(0, 0, 690, 360, 0x07101e, 0.97).setStrokeStyle(2, 0xb87cff, 0.9));
+    this.eventPanel.add(this.add.text(0, -145, this.activeEvent.title, { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5));
+    this.eventPanel.add(this.add.text(-290, -104, this.activeEvent.description, {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#dff7ff',
       wordWrap: { width: 580 },
       lineSpacing: 5
     }));
-    this.activeEvent.options.forEach((option, index) => this.eventPanel?.add(this.createEventOptionButton(option, index)));
+    this.eventPanel.add(this.add.text(-290, -38, `Effect: ${this.activeEvent.effectText}`, {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#ffe6ad',
+      wordWrap: { width: 580 },
+      lineSpacing: 5
+    }));
+    this.eventPanel.add(this.add.text(-290, 26, `Next: ${this.activeEvent.followUpObjective}`, {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#8ffcff',
+      wordWrap: { width: 580 },
+      lineSpacing: 5
+    }));
+    this.eventPanel.add(this.createEventContinueButton());
   }
 
-  private createEventOptionButton(option: DungeonEventOption, index: number) {
-    const canChoose = option.canChoose(this);
-    const y = -18 + index * 62;
-    const button = this.add.container(0, y);
-    const rect = this.add.rectangle(0, 0, 540, 44, canChoose ? 0x10233a : 0x1a1d25, 0.96).setStrokeStyle(1, canChoose ? 0x8ffcff : 0x506070).setInteractive({ useHandCursor: canChoose });
-    rect.on('pointerdown', () => this.chooseEventOption(index));
-    rect.on('pointerover', () => canChoose && rect.setFillStyle(0x173756, 0.98));
-    rect.on('pointerout', () => canChoose && rect.setFillStyle(0x10233a, 0.96));
-    const label = canChoose ? `${index + 1}. ${option.text}` : `${index + 1}. ${option.text}（${option.disabledText ?? '不可选'}）`;
+  private createEventContinueButton() {
+    const button = this.add.container(0, 124);
+    const rect = this.add.rectangle(0, 0, 220, 46, 0x10233a, 0.96).setStrokeStyle(1, 0x8ffcff).setInteractive({ useHandCursor: true });
+    rect.on('pointerdown', () => this.resolveActiveEvent());
+    rect.on('pointerover', () => rect.setFillStyle(0x173756, 0.98));
+    rect.on('pointerout', () => rect.setFillStyle(0x10233a, 0.96));
     button.add(rect);
-    button.add(this.add.text(-252, -10, label, { fontFamily: 'monospace', fontSize: '15px', color: canChoose ? '#ffffff' : '#8a98a8', wordWrap: { width: 500 } }));
+    button.add(this.add.text(0, 0, 'Continue  E / Space', { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }).setOrigin(0.5));
     return button;
   }
 
-  private chooseEventOption(index: number) {
+  private resolveActiveEvent() {
     if (this.flowState !== 'event' || !this.activeEvent) return;
-    const option = this.activeEvent.options[index];
-    if (!option) return;
-    if (!option.canChoose(this)) {
-      this.log(option.disabledText ?? '当前无法选择该事件选项。');
-      return;
-    }
-    const result = option.apply(this);
+    const event = this.activeEvent;
+    const result = event.applyEffect(this);
     this.eventChoiceCount += 1;
+    this.eventStats.triggered += 1;
+    if (event.category === 'penalty' || event.category === 'curse' || event.category === 'mixed') this.eventStats.negative += 1;
+    if (event.category === 'combat') this.eventStats.combat += 1;
+    if (event.oncePerRun) this.eventsSeen.add(event.id);
     this.currentRoom.eventResolved = true;
     this.eventPanel?.destroy();
     this.eventPanel = undefined;
     this.activeEvent = undefined;
     this.flowState = 'playing';
     this.physics.world.resume();
-    this.showFloatingText(this.player.x, this.player.y - 72, result, '#d9b8ff');
-    this.log(`事件结果：${result}`);
-    this.openPortal('事件已完成。传送门已开启，按 E 选择下一房间。');
+    if (result.floatingText) this.showFloatingText(this.player.x, this.player.y - 72, result.floatingText, event.category === 'penalty' || event.category === 'curse' ? '#ffb0b0' : '#d9b8ff');
+    this.log(result.log);
+    if (result.enemies?.length) {
+      this.currentRoom.enemies = result.enemies;
+      this.currentRoom.isCleared = false;
+      this.roomCleared = false;
+      this.eventCombatGoldReward = result.goldReward ?? 0;
+      this.eventCombatRareRewardChance = result.rareRewardChance ?? 0;
+      this.updateDoor();
+      this.spawnEnemies();
+      return;
+    }
+    if (result.opensPortal !== false) this.openPortal('Event complete. Portal opened. Press E to choose the next room.');
+  }
+
+  private pickEventPackEvent() {
+    const roomNumber = this.currentRoomIndex + 1;
+    const hpRatio = this.player.stats.hp / this.player.stats.maxHp;
+    const routeHasSupply = this.dungeonRoute.some((room) => room.kind === 'rest');
+    const candidates = EVENT_PACK.filter((event) => {
+      if (!event.roomTags.includes(this.currentRoom.kind)) return false;
+      if (event.oncePerRun && this.eventsSeen.has(event.id)) return false;
+      if (event.minRoomIndex && roomNumber < event.minRoomIndex) return false;
+      if (event.maxRoomIndex && roomNumber > event.maxRoomIndex) return false;
+      return true;
+    });
+    const weighted = candidates.map((event) => {
+      let weight = event.weight;
+      if (hpRatio < 0.35 && event.category === 'supply') weight += 8;
+      if (!routeHasSupply && event.category === 'supply') weight += 4;
+      if (hpRatio < 0.25 && (event.category === 'penalty' || event.category === 'combat')) weight = Math.max(1, Math.floor(weight * 0.55));
+      return { event, weight };
+    });
+    const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+    let roll = Phaser.Math.Between(1, Math.max(1, total));
+    for (const item of weighted) {
+      roll -= item.weight;
+      if (roll <= 0) return item.event;
+    }
+    return weighted[0]?.event ?? EVENT_PACK[0];
   }
 
   private interact() {
@@ -2586,21 +3075,27 @@ export class DungeonScene extends Phaser.Scene {
     const dashLeft = Math.max(0, Math.ceil((this.skillCooldowns.dashSlash - time) / 1000));
     const shieldLeft = Math.max(0, Math.ceil((this.skillCooldowns.shield - time) / 1000));
     const shieldActive = time < this.shieldUntil;
-    const shieldStatus = shieldActive ? '激活中' : shieldLeft === 0 ? '可用' : `冷却 ${shieldLeft} 秒`;
+    const shieldStatus = shieldActive ? 'Active' : shieldLeft === 0 ? 'Ready' : `CD ${shieldLeft}s`;
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
-    const recentRelics = this.relicState.relics.slice(-3).map((relic) => relic.name).join('、') || '无';
+    const recentRelics = this.relicState.relics.slice(-3).map((relic) => relic.name).join(' / ') || 'None';
+    const statuses = [
+      this.poisonRooms > 0 ? `Poison ${this.poisonRooms} room` : '',
+      this.rustRooms > 0 ? `Rust ${this.rustRooms} room` : '',
+      this.roomSpeedMultiplier < 1 ? 'Slow' : ''
+    ].filter(Boolean).join('  ') || 'Clear';
     this.statusText.setText([
-      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ''}`,
+      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ""}`,
       `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
-      `Gold ${this.gold}    遗物 ${this.relicState.relics.length}`,
-      `近期 ${recentRelics}`
+      `Gold ${this.gold}    Relics ${this.relicState.relics.length}`,
+      `Status ${statuses}`,
+      `Recent ${recentRelics}`
     ]);
     this.skillText.setText([
-      '[J] 普通攻击',
-      `[K] 冲刺斩：${dashLeft === 0 ? '可用' : `冷却 ${dashLeft} 秒`}`,
-      `[L] 护盾：${shieldStatus}`
+      '[J] Attack',
+      `[K] Dash Slash: ${dashLeft === 0 ? 'Ready' : `CD ${dashLeft}s`}`,
+      `[L] Shield: ${shieldStatus}`
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.currentRoom.name}`,
@@ -2708,17 +3203,16 @@ export class DungeonScene extends Phaser.Scene {
       const targetRoom = this.dungeonRoute[targetIndex];
       const sprite = this.add.image(x, y, this.assetKey(this.roomCleared ? 'door_open' : 'door_closed')).setDisplaySize(44, 84).setData('roomObj', true).setDepth(7);
       sprite.setAlpha(this.roomCleared ? 1 : 0.52).setTint(this.roomCleared ? 0xbaffff : 0x40536a);
-      const tag = this.getBranchRouteTag(targetRoom);
-      const bg = this.add.rectangle(x - 108, y - 62, 184, 42, 0x07101e, 0.82).setStrokeStyle(1, this.roomCleared ? 0x8ffcff : 0x506070).setData('roomObj', true).setDepth(80);
-      const label = this.add.text(x - 196, y - 77, `${index === 0 ? '左门' : '右门'}：${targetRoom.name}\n${tag}`, {
+      const bg = this.add.rectangle(x - 104, y - 54, 142, 28, 0x07101e, 0.78).setStrokeStyle(1, this.roomCleared ? 0x8ffcff : 0x506070).setData('roomObj', true).setDepth(80);
+      const label = this.add.text(x - 104, y - 55, targetRoom.name, {
         fontFamily: 'monospace',
-        fontSize: '12px',
-        color: this.roomCleared ? '#8ffcff' : '#7c91a8',
+        fontSize: '13px',
+        color: this.roomCleared ? '#dff7ff' : '#7c91a8',
         stroke: '#07101e',
         strokeThickness: 3,
-        wordWrap: { width: 176 },
-        lineSpacing: 2
-      }).setDepth(81).setData('roomObj', true);
+        align: 'center',
+        wordWrap: { width: 132 }
+      }).setOrigin(0.5).setDepth(81).setData('roomObj', true);
       this.branchDoorSprites.push(sprite);
       this.branchDoorLabels.push(label, bg);
       if (this.roomCleared) {
@@ -2886,7 +3380,7 @@ export class DungeonScene extends Phaser.Scene {
       goldEarned: this.gold,
       equipmentFound: 0,
       relicsFound: this.relicState.relics.length,
-      eventsTriggered: this.skillUses,
+      eventsTriggered: this.eventStats.triggered,
       bossRemainingHpPercent,
       deathReason: victory ? '源晶净化完成' : reason,
       score: grade === 'A' ? 95 : grade === 'B' ? 82 : grade === 'C' ? 65 : 45,
@@ -2896,7 +3390,11 @@ export class DungeonScene extends Phaser.Scene {
       eliteRooms: this.getEliteRoomsVisited(),
       rewardChoices: this.rewardChoiceCount,
       finalRoomType: this.currentRoom.kind,
-      reachedBoss: visitedRooms.some((room) => room.kind === 'boss')
+      reachedBoss: visitedRooms.some((room) => room.kind === 'boss'),
+      negativeEvents: this.eventStats.negative,
+      combatEvents: this.eventStats.combat,
+      wasPoisoned: this.eventStats.poisoned,
+      wasCursed: this.eventStats.cursed
     };
     storageService.saveRun(run);
     this.setGameplayUiVisible(false);
@@ -2906,23 +3404,25 @@ export class DungeonScene extends Phaser.Scene {
     this.settlementPanel = panel;
     panel.add(this.add.rectangle(0, 0, 720, 470, 0x07101e, 0.98).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
     panel.add(this.add.text(-310, -205, victory ? '源晶已净化' : '遗迹探索终止', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }));
-    const relicNames = this.relicState.relics.map((relic) => relic.name).join('、') || '无';
-    const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? '是' : '否';
+    const relicNames = this.relicState.relics.map((relic) => relic.name).join(' / ') || 'None';
+    const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? 'Yes' : 'No';
     panel.add(this.add.text(-310, -160, [
-      `结果：${victory ? '胜利，源晶已净化' : '失败，遗迹探索终止'}`,
-      `用时：${durationSeconds} 秒`,
-      `击杀数：${this.kills}`,
-      `受到伤害：${this.damageTaken}`,
-      `使用技能次数：${this.skillUses}`,
-      `经过房间：${visitedRooms.length}  事件选择：${this.eventChoiceCount}  精英房：${this.getEliteRoomsVisited()}`,
-      `奖励选择：${this.rewardChoiceCount}  获得遗物：${this.relicState.relics.length}`,
-      `本局路线：${routeSummary}`,
-      `遗物数量：${this.relicState.relics.length}    Epic：${hasEpic}`,
-      `遗物列表：${relicNames}`,
-      `最终 HP：${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK：${this.player.stats.atk}  DEF：${this.player.stats.def}`,
-      `本局构筑：${this.getBuildSummary()}`,
-      `死亡原因：${run.deathReason}`,
-      `评分：${grade}`
+      `Result: ${victory ? 'Victory' : 'Defeat'}`,
+      `Duration: ${durationSeconds}s`,
+      `Kills: ${this.kills}`,
+      `Damage Taken: ${this.damageTaken}`,
+      `Skill Uses: ${this.skillUses}`,
+      `Rooms: ${visitedRooms.length}  Events: ${this.eventStats.triggered}  Elite Rooms: ${this.getEliteRoomsVisited()}`,
+      `Negative Events: ${this.eventStats.negative}  Combat Events: ${this.eventStats.combat}`,
+      `Statuses: ${this.eventStats.poisoned ? 'Poisoned' : 'No poison'} / ${this.eventStats.cursed ? 'Cursed' : 'No curse'}`,
+      `Reward Choices: ${this.rewardChoiceCount}  Relics: ${this.relicState.relics.length}`,
+      `Route: ${routeSummary}`,
+      `Epic Relic: ${hasEpic}`,
+      `Relic List: ${relicNames}`,
+      `Final HP: ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK: ${this.player.stats.atk}  DEF: ${this.player.stats.def}`,
+      `Build: ${this.getBuildSummary()}`,
+      `Reason: ${run.deathReason}`,
+      `Grade: ${grade}`
     ], { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 4, wordWrap: { width: 620 } }));
     panel.add(this.createMenuButton(-105, 198, 170, '重新开始', () => {
       this.settlementPanel?.destroy();
