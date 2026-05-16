@@ -683,6 +683,7 @@ export class DungeonScene extends Phaser.Scene {
   private currentRoomIndex = 0;
   private dungeonRoute: RoomDef[] = [];
   private visitedRoomIds: string[] = [];
+  private enteredRoomNumbers = new Map<string, number>();
   private currentRoom = this.createRouteRoom(ROOM_TEMPLATES.start[0], 0);
   private roomCleared = false;
   private rewardTaken = false;
@@ -1006,7 +1007,7 @@ export class DungeonScene extends Phaser.Scene {
       `DEF：${this.player.stats.def}`,
       `金币：${this.gold}`,
       `遗物：${this.relicState.relics.length}`,
-      `当前房间：第 ${this.currentRoomIndex + 1} / ${this.dungeonRoute.length} 房`,
+      `当前房间：第 ${this.getDisplayRoomNumber()} / ${this.getDisplayTotalRooms()} 房`,
       `房间类型：${this.getRoomTypeLabel()}`
     ].join('\n');
   }
@@ -1341,6 +1342,33 @@ export class DungeonScene extends Phaser.Scene {
     return entries[0][0];
   }
 
+  private getDisplayRoomNumber(room: RoomDef = this.currentRoom) {
+    return this.enteredRoomNumbers.get(room.id) ?? this.visitedRoomIds.length + 1;
+  }
+
+  private getDisplayTotalRooms() {
+    if (this.currentRoom.kind === 'boss') return this.getDisplayRoomNumber();
+    return this.getDisplayRoomNumber() + this.countRemainingDisplayRooms(this.currentRoomIndex, new Set([this.currentRoomIndex]));
+  }
+
+  private countRemainingDisplayRooms(fromIndex: number, seen: Set<number>): number {
+    const room = this.dungeonRoute[fromIndex];
+    if (!room || room.kind === 'boss' || room.nextOptions.length === 0) return 0;
+
+    const selectedTarget = room.selectedBranch;
+    const targets = selectedTarget !== undefined ? [selectedTarget] : room.nextOptions;
+    let best = 0;
+    targets.forEach((targetIndex) => {
+      if (seen.has(targetIndex)) return;
+      const nextRoom = this.dungeonRoute[targetIndex];
+      if (!nextRoom) return;
+      const nextSeen = new Set(seen);
+      nextSeen.add(targetIndex);
+      best = Math.max(best, 1 + this.countRemainingDisplayRooms(targetIndex, nextSeen));
+    });
+    return best;
+  }
+
   private getRoomDisplayName(room: RoomDef = this.currentRoom) {
     if (room.kind === 'treasure') return '封尘宝库';
     return room.name;
@@ -1393,6 +1421,7 @@ export class DungeonScene extends Phaser.Scene {
     this.currentRoomIndex = 0;
     this.dungeonRoute = this.generateDungeonRoute();
     this.visitedRoomIds = [];
+    this.enteredRoomNumbers.clear();
     this.currentRoom = this.dungeonRoute[0];
     this.roomCleared = false;
     this.rewardTaken = false;
@@ -1540,7 +1569,10 @@ export class DungeonScene extends Phaser.Scene {
   private loadRoom(index: number) {
     this.currentRoomIndex = index;
     this.currentRoom = this.dungeonRoute[index] ?? this.dungeonRoute[this.dungeonRoute.length - 1];
-    if (!this.visitedRoomIds.includes(this.currentRoom.id)) this.visitedRoomIds.push(this.currentRoom.id);
+    if (!this.visitedRoomIds.includes(this.currentRoom.id)) {
+      this.visitedRoomIds.push(this.currentRoom.id);
+      this.enteredRoomNumbers.set(this.currentRoom.id, this.visitedRoomIds.length);
+    }
     this.roomCleared = this.currentRoom.isCleared || (this.currentRoom.enemies.length === 0 && this.currentRoom.kind !== 'treasure' && this.currentRoom.kind !== 'event' && this.currentRoom.kind !== 'rest');
     this.rewardTaken = this.currentRoom.rewardClaimed;
     this.enemies.clear(true, true);
@@ -3268,7 +3300,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private pickEventPackEvent() {
-    const roomNumber = this.currentRoomIndex + 1;
+    const roomNumber = this.getDisplayRoomNumber();
     const hpRatio = this.player.stats.hp / this.player.stats.maxHp;
     const candidates = EVENT_PACK.filter((event) => {
       if (!event.roomTags.includes(this.currentRoom.kind)) return false;
@@ -3420,7 +3452,7 @@ export class DungeonScene extends Phaser.Scene {
       '[E] 互动  [Esc] 暂停  [R] 重开'
     ]);
     this.roomText.setText([
-      `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.getRoomDisplayName()}`,
+      `${this.getDisplayRoomNumber()}/${this.getDisplayTotalRooms()} ${this.getRoomDisplayName()}`,
       this.getWaveHudText(),
       this.getContextHint(),
       this.getNearbyBranchHint(),
@@ -3459,9 +3491,11 @@ export class DungeonScene extends Phaser.Scene {
 
   private showRoomTitle() {
     this.roomTitleToast?.destroy();
+    const roomNumber = this.getDisplayRoomNumber();
+    const totalRooms = this.getDisplayTotalRooms();
     const title = this.currentRoom.kind === 'boss'
-      ? `第 ${this.currentRoomIndex + 1}/${this.dungeonRoute.length} 房：首领房：晶核守卫`
-      : `第 ${this.currentRoomIndex + 1}/${this.dungeonRoute.length} 房：${this.getRoomDisplayName()}`;
+      ? `第 ${roomNumber}/${totalRooms} 房：首领房：晶核守卫`
+      : `第 ${roomNumber}/${totalRooms} 房：${this.getRoomDisplayName()}`;
     this.roomTitleToast = this.add.text(480, 300, title, {
       fontFamily: 'monospace',
       fontSize: this.currentRoom.kind === 'boss' ? '30px' : '28px',
