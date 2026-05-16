@@ -1140,58 +1140,68 @@ export class DungeonScene extends Phaser.Scene {
 
   private generateDungeonRoute() {
     const targetLength = Phaser.Math.Between(6, 8);
-    const routeKinds: RoomKind[] = ['start', 'battle'];
-    const eventCandidates: number[] = [];
-    for (let index = 2; index <= targetLength - 3; index += 1) eventCandidates.push(index);
-    const eventSlot = eventCandidates.length > 0 && Phaser.Math.Between(1, 100) <= 58
-      ? Phaser.Utils.Array.GetRandom(eventCandidates)
-      : undefined;
+    const maxOptionalRooms = targetLength >= 7 ? 2 : 1;
+    const optionalKinds = Phaser.Utils.Array.Shuffle([
+      ...(Phaser.Math.Between(1, 100) <= 55 ? ['event' as RoomKind] : []),
+      ...(Phaser.Math.Between(1, 100) <= 75 ? ['treasure' as RoomKind] : [])
+    ]).slice(0, maxOptionalRooms);
+    if (optionalKinds.length === 0) optionalKinds.push('treasure');
 
-    let eliteCount = 0;
-    for (let index = 2; index < targetLength - 1; index += 1) {
-      if (index === eventSlot) {
-        routeKinds.push('event');
-        continue;
-      }
-
-      const previous = routeKinds[routeKinds.length - 1];
-      const isPreBoss = index === targetLength - 2;
-      const pool: Array<[RoomKind, number]> = isPreBoss
-        ? [['treasure', 28], ['battle', 42], ['elite', 14]]
-        : [['battle', 46], ['treasure', 28], ['elite', 18]];
-      const legalPool = pool.filter(([kind]) => {
-        if (kind === 'elite' && (index <= 2 || eliteCount >= (targetLength === 8 ? 2 : 1))) return false;
-        if (kind === 'treasure' && previous === 'treasure') return false;
-        if ((kind === 'battle' || kind === 'elite') && previous === 'elite' && isPreBoss) return false;
-        return true;
-      });
-      const chosen = this.pickWeightedRoomKind(legalPool.length > 0 ? legalPool : [['battle', 1]]);
-      if (chosen === 'elite') eliteCount += 1;
-      routeKinds.push(chosen);
+    const middleCount = Math.max(3, targetLength - optionalKinds.length - 2);
+    const eliteSlot = Phaser.Math.Between(1, middleCount - 1);
+    const backboneKinds: RoomKind[] = ['start'];
+    for (let index = 0; index < middleCount; index += 1) {
+      if (index === 0) backboneKinds.push('battle');
+      else if (index === eliteSlot) backboneKinds.push('elite');
+      else backboneKinds.push(Phaser.Math.Between(1, 100) <= 24 ? 'elite' : 'battle');
     }
-    routeKinds.push('boss');
+    if (backboneKinds.filter((kind) => kind === 'battle').length < 2) {
+      for (let index = backboneKinds.length - 1; index > 0; index -= 1) {
+        if (backboneKinds[index] !== 'elite' || index === eliteSlot + 1) continue;
+        backboneKinds[index] = 'battle';
+        break;
+      }
+    }
+    backboneKinds.push('boss');
 
-    const route = routeKinds.map((kind, index) => this.createRouteRoom(this.randomTemplate(kind), index));
-    route.forEach((room, index) => {
-      room.nextOptions = index < route.length - 1 ? [index + 1] : [];
+    const eligibleEdges = backboneKinds
+      .map((kind, index) => ({ kind, index }))
+      .filter(({ kind, index }) => index > 0 && index < backboneKinds.length - 2 && (kind === 'battle' || kind === 'elite'))
+      .map(({ index }) => index);
+    const optionalByEdge = new Map<number, RoomKind>();
+    Phaser.Utils.Array.Shuffle([...eligibleEdges]).slice(0, optionalKinds.length).forEach((edgeIndex, index) => {
+      optionalByEdge.set(edgeIndex, optionalKinds[index]);
     });
 
-    const branchable = route
-      .slice(1, -3)
-      .map((room, offset) => ({ room, index: offset + 1 }))
-      .filter(({ index }) => {
-        if (index + 2 >= route.length - 1 || route[index + 1].kind === route[index + 2].kind) return false;
-        const next = route[index + 1];
-        const skip = route[index + 2];
-        if (next.kind === 'event' && skip.kind === 'event') return false;
-        if (next.kind === 'treasure' && skip.kind === 'treasure') return false;
-        return true;
-      });
-    const branchCountTarget = Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1);
-    const branchCount = Math.min(branchable.length, branchCountTarget);
-    Phaser.Utils.Array.Shuffle(branchable).slice(0, branchCount).forEach(({ room, index }) => {
-      room.nextOptions = [index + 1, index + 2];
+    const entries: Array<{ kind: RoomKind; backboneIndex?: number; optionalForEdge?: number }> = [{ kind: backboneKinds[0], backboneIndex: 0 }];
+    for (let edgeIndex = 0; edgeIndex < backboneKinds.length - 1; edgeIndex += 1) {
+      const optionalKind = optionalByEdge.get(edgeIndex);
+      if (optionalKind) entries.push({ kind: optionalKind, optionalForEdge: edgeIndex });
+      entries.push({ kind: backboneKinds[edgeIndex + 1], backboneIndex: edgeIndex + 1 });
+    }
+
+    const route = entries.map((entry, index) => this.createRouteRoom(this.randomTemplate(entry.kind), index));
+    const finalIndexByBackbone = new Map<number, number>();
+    const optionalIndexByEdge = new Map<number, number>();
+    entries.forEach((entry, index) => {
+      if (entry.backboneIndex !== undefined) finalIndexByBackbone.set(entry.backboneIndex, index);
+      if (entry.optionalForEdge !== undefined) optionalIndexByEdge.set(entry.optionalForEdge, index);
     });
+
+    entries.forEach((entry, index) => {
+      if (entry.optionalForEdge !== undefined) {
+        route[index].nextOptions = [finalIndexByBackbone.get(entry.optionalForEdge + 1)!];
+        return;
+      }
+      if (entry.backboneIndex === undefined || entry.backboneIndex >= backboneKinds.length - 1) {
+        route[index].nextOptions = [];
+        return;
+      }
+      const mainTarget = finalIndexByBackbone.get(entry.backboneIndex + 1)!;
+      const optionalTarget = optionalIndexByEdge.get(entry.backboneIndex);
+      route[index].nextOptions = optionalTarget === undefined ? [mainTarget] : [mainTarget, optionalTarget];
+    });
+
     return route;
   }
 
@@ -3213,17 +3223,6 @@ export class DungeonScene extends Phaser.Scene {
         }));
       }
     });
-  }
-
-  private getBranchRouteTag(room: RoomDef) {
-    const kind = room.kind as RoomKind;
-    if (kind === 'treasure') return '安全 / 较低收益';
-    if (kind === 'battle') return '稳定收益';
-    if (kind === 'elite') return room.name.includes('精英') ? '高风险 / 稀有奖励' : '高压 / 更好奖励';
-    if (kind === 'event') return '代价 / 随机收益';
-    if (kind === 'rest') return '恢复';
-    if (kind === 'boss') return '最终挑战';
-    return '继续深入';
   }
 
   private countLivingEnemies() {
