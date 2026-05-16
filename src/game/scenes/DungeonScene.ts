@@ -111,6 +111,7 @@ type EventEffectType =
   | 'defense'
   | 'gold'
   | 'heal'
+  | 'potion-box'
   | 'cleanse'
   | 'ambush'
   | 'elite-patrol'
@@ -254,7 +255,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '石缝里弹出一排隐藏尖刺，寒光贴着护甲划过。',
     category: 'penalty',
     rarity: 'common',
-    weight: 12,
+    weight: 10,
     effectType: 'spike',
     effectText: '受到 10-16 点伤害，最低保留 1 HP。',
     followUpObjective: '通道会在陷阱停止后开启。',
@@ -275,7 +276,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '脚下石板突然崩裂，碎石滚落进漆黑裂隙。',
     category: 'penalty',
     rarity: 'common',
-    weight: 10,
+    weight: 9,
     effectType: 'collapse',
     effectText: '受到 8-12 点伤害，下一房间移动速度降低 8%。',
     followUpObjective: '带着碎石拖累继续前进。',
@@ -297,7 +298,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '绿色雾气从破裂源晶中渗出，顺着呼吸侵入体内。',
     category: 'curse',
     rarity: 'common',
-    weight: 9,
+    weight: 8,
     effectType: 'poison',
     effectText: '获得中毒 2 房；每进入新房扣 4 HP，最低保留 1 HP。',
     followUpObjective: '寻找净化或撑过接下来的房间。',
@@ -317,7 +318,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '铁锈色符文爬上护甲，防护层发出细碎裂响。',
     category: 'curse',
     rarity: 'common',
-    weight: 9,
+    weight: 8,
     effectType: 'rust',
     effectText: '接下来 2 个房间 DEF -1，不会低于 0。',
     followUpObjective: '诅咒结束后护甲会恢复。',
@@ -337,7 +338,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '倒塌的武器架里还有一把能用的源晶短刃。',
     category: 'benefit',
     rarity: 'common',
-    weight: 14,
+    weight: 10,
     effectType: 'attack',
     effectText: '获得 ATK +2。',
     followUpObjective: '整理武器后继续前进。',
@@ -357,7 +358,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一只旧箱子半埋在灰尘里，里面留着还能装配的护甲片。',
     category: 'benefit',
     rarity: 'common',
-    weight: 12,
+    weight: 10,
     effectType: 'defense',
     effectText: '获得 DEF +1。',
     followUpObjective: '装好护甲后继续前进。',
@@ -377,7 +378,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '墙角散着一只旧钱袋，几枚金币还带着微弱温度。',
     category: 'benefit',
     rarity: 'common',
-    weight: 13,
+    weight: 10,
     effectType: 'gold',
     effectText: '获得 15-30 金币。',
     followUpObjective: '收起金币后通道开启。',
@@ -398,7 +399,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一眼源晶泉水仍未被完全污染，清亮的光晕缓慢荡开。',
     category: 'supply',
     rarity: 'rare',
-    weight: 8,
+    weight: 5,
     effectType: 'heal',
     effectText: '回复 20-30 HP；低于 35% HP 时额外回复 10 HP。',
     followUpObjective: '恢复后继续深入。',
@@ -415,12 +416,32 @@ const EVENT_PACK: EventPackDef[] = [
     }
   },
   {
+    id: 'abandoned-potion-box',
+    title: '废弃药剂箱',
+    description: '破损木箱里还剩下一支密封药剂，药液已经有些浑浊。',
+    category: 'supply',
+    rarity: 'common',
+    weight: 4,
+    effectType: 'potion-box',
+    effectText: '回复 12-18 HP，受药剂遗物加成影响。',
+    followUpObjective: '使用药剂后继续前进。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const healed = scene.healPlayer(Phaser.Math.Between(12, 18) + scene.relicState.potionHealBonus);
+      return {
+        log: '你在废弃药剂箱中找到一支还能使用的药剂。',
+        floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
+        opensPortal: true
+      };
+    }
+  },
+  {
     id: 'purifying-light',
     title: '净化之光',
     description: '一束洁白源光穿过穹顶裂缝，短暂压住了污染回声。',
     category: 'supply',
     rarity: 'rare',
-    weight: 7,
+    weight: 4,
     effectType: 'cleanse',
     effectText: '清除中毒或锈蚀；若没有异常状态，获得 10 点临时护盾。',
     followUpObjective: '净化完成后通道开启。',
@@ -441,7 +462,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '脚步声从墙后同时响起，通道被突然落下的石门封锁。',
     category: 'combat',
     rarity: 'common',
-    weight: 10,
+    weight: 6,
     effectType: 'ambush',
     effectText: '生成一小波普通怪；清完后开启传送门。',
     followUpObjective: '击败伏击怪物。',
@@ -460,7 +481,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '带着源晶徽记的巡逻队从阴影中逼近，精英守卫已经锁定你。',
     category: 'combat',
     rarity: 'rare',
-    weight: 3,
+    weight: 2,
     effectType: 'elite-patrol',
     effectText: '生成 1 个精英怪和 1 个普通怪；清完后给少量金币，低概率给 rare 奖励。',
     followUpObjective: '击败精英巡逻队。',
@@ -482,7 +503,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '裂纹源晶在掌心震颤，危险能量和可用力量同时溢出。',
     category: 'mixed',
     rarity: 'rare',
-    weight: 6,
+    weight: 4,
     effectType: 'unstable-crystal',
     effectText: '受到 8 点伤害，并获得随机 common 或 rare 奖励。',
     followUpObjective: '吸收残余能量后继续前进。',
@@ -1119,87 +1140,54 @@ export class DungeonScene extends Phaser.Scene {
 
   private generateDungeonRoute() {
     const targetLength = Phaser.Math.Between(6, 8);
-    const middleSlots = targetLength - 4;
-    const branchCombos: RoomKind[][] = [
-      ['treasure', 'elite'],
-      ['event', 'battle'],
-      ['rest', 'elite'],
-      ['battle', 'elite'],
-      ['treasure', 'event'],
-      ['battle', 'elite']
-    ];
-    const branchCountTarget = Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1);
-    const middle: RoomKind[] = [];
+    const routeKinds: RoomKind[] = ['start', 'battle'];
+    const eventCandidates: number[] = [];
+    for (let index = 2; index <= targetLength - 3; index += 1) eventCandidates.push(index);
+    const eventSlot = eventCandidates.length > 0 && Phaser.Math.Between(1, 100) <= 58
+      ? Phaser.Utils.Array.GetRandom(eventCandidates)
+      : undefined;
 
-    const isMiddleLegal = (candidate: RoomKind, list: RoomKind[]) => {
-      const position = list.length + 2;
-      const previous = list[list.length - 1];
-      if (candidate === 'boss' || candidate === 'start') return false;
-      if (candidate === 'elite' && position <= 2) return false;
-      if (candidate === 'elite' && list.filter((kind) => kind === 'elite').length >= (targetLength === 8 ? 2 : 1)) return false;
-      if ((candidate === 'event' && previous === 'event') || (candidate === 'treasure' && previous === 'treasure')) return false;
-      return true;
-    };
-
-    const addKind = (candidate: RoomKind) => {
-      if (middle.length >= middleSlots || !isMiddleLegal(candidate, middle)) return false;
-      middle.push(candidate);
-      return true;
-    };
-
-    const shuffledCombos = Phaser.Utils.Array.Shuffle([...branchCombos]);
-    while (middle.length < middleSlots && shuffledCombos.length > 0 && middle.length < branchCountTarget * 2) {
-      const combo = shuffledCombos.shift();
-      if (!combo || middle.length + 2 > middleSlots) continue;
-      const ordered = Phaser.Utils.Array.Shuffle([...combo]);
-      const preview = [...middle];
-      if (ordered.every((kind) => isMiddleLegal(kind, preview) && Boolean(preview.push(kind)))) {
-        ordered.forEach((kind) => middle.push(kind));
+    let eliteCount = 0;
+    for (let index = 2; index < targetLength - 1; index += 1) {
+      if (index === eventSlot) {
+        routeKinds.push('event');
+        continue;
       }
-    }
 
-    const fillerPool: RoomKind[] = ['battle', 'treasure', 'event', 'battle'];
-    if (middleSlots >= 3) fillerPool.push('elite');
-    let guard = 0;
-    while (middle.length < middleSlots && guard < 80) {
-      guard += 1;
-      addKind(Phaser.Utils.Array.GetRandom(fillerPool));
+      const previous = routeKinds[routeKinds.length - 1];
+      const isPreBoss = index === targetLength - 2;
+      const pool: Array<[RoomKind, number]> = isPreBoss
+        ? [['treasure', 28], ['battle', 42], ['elite', 14]]
+        : [['battle', 46], ['treasure', 28], ['elite', 18]];
+      const legalPool = pool.filter(([kind]) => {
+        if (kind === 'elite' && (index <= 2 || eliteCount >= (targetLength === 8 ? 2 : 1))) return false;
+        if (kind === 'treasure' && previous === 'treasure') return false;
+        if ((kind === 'battle' || kind === 'elite') && previous === 'elite' && isPreBoss) return false;
+        return true;
+      });
+      const chosen = this.pickWeightedRoomKind(legalPool.length > 0 ? legalPool : [['battle', 1]]);
+      if (chosen === 'elite') eliteCount += 1;
+      routeKinds.push(chosen);
     }
-    while (middle.length < middleSlots) addKind('battle');
-    if (middleSlots >= 2 && middle[0] === middle[1]) {
-      const alternatives: RoomKind[] = middle[0] === 'battle' ? ['treasure', 'event'] : ['battle'];
-      const replacement = alternatives.find((kind) => isMiddleLegal(kind, [middle[0]]));
-      if (replacement) middle[1] = replacement;
-    }
+    routeKinds.push('boss');
 
-    let preBossKind = this.pickWeightedRoomKind([
-      ['rest', 30],
-      ['event', 25],
-      ['treasure', 20],
-      ['battle', 15],
-      ['elite', 10]
-    ]);
-    const previousKind = middle[middle.length - 1] ?? 'battle';
-    if ((preBossKind === 'battle' || preBossKind === 'elite') && previousKind === 'elite' && Phaser.Math.Between(1, 100) <= 75) {
-      preBossKind = Phaser.Utils.Array.GetRandom(['rest', 'event', 'treasure'] as RoomKind[]);
-    }
-
-    const routeKinds: RoomKind[] = ['start', 'battle', ...middle, preBossKind, 'boss'];
     const route = routeKinds.map((kind, index) => this.createRouteRoom(this.randomTemplate(kind), index));
     route.forEach((room, index) => {
       room.nextOptions = index < route.length - 1 ? [index + 1] : [];
     });
+
     const branchable = route
       .slice(1, -3)
       .map((room, offset) => ({ room, index: offset + 1 }))
       .filter(({ index }) => {
-        if (index + 2 >= route.length - 2 || route[index + 1].kind === route[index + 2].kind) return false;
+        if (index + 2 >= route.length - 1 || route[index + 1].kind === route[index + 2].kind) return false;
         const next = route[index + 1];
         const skip = route[index + 2];
         if (next.kind === 'event' && skip.kind === 'event') return false;
         if (next.kind === 'treasure' && skip.kind === 'treasure') return false;
         return true;
       });
+    const branchCountTarget = Phaser.Math.Between(1, targetLength >= 7 ? 2 : 1);
     const branchCount = Math.min(branchable.length, branchCountTarget);
     Phaser.Utils.Array.Shuffle(branchable).slice(0, branchCount).forEach(({ room, index }) => {
       room.nextOptions = [index + 1, index + 2];
@@ -1660,7 +1648,7 @@ export class DungeonScene extends Phaser.Scene {
           .setData('shockCharging', false)
           .setData('nextSpike', this.time.now + 2200);
       }
-      const trueElite = (this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳') || (this.currentRoom.kind === 'event' && this.eventCombatRareRewardChance > 0 && index === 0)) && kind !== 'boss';
+      const trueElite = this.currentRoom.name.includes('精英') && kind !== 'boss';
       const eliteBoosted = this.currentRoom.kind === 'elite' && kind !== 'boss';
       const hp = trueElite ? Math.ceil(base.hp * 1.25) : eliteBoosted ? Math.ceil(base.hp * 1.1) : base.hp;
       const maxHp = trueElite ? Math.ceil(base.maxHp * 1.25) : eliteBoosted ? Math.ceil(base.maxHp * 1.1) : base.maxHp;
@@ -2948,7 +2936,6 @@ export class DungeonScene extends Phaser.Scene {
   private pickEventPackEvent() {
     const roomNumber = this.currentRoomIndex + 1;
     const hpRatio = this.player.stats.hp / this.player.stats.maxHp;
-    const routeHasSupply = this.dungeonRoute.some((room) => room.kind === 'rest');
     const candidates = EVENT_PACK.filter((event) => {
       if (!event.roomTags.includes(this.currentRoom.kind)) return false;
       if (event.oncePerRun && this.eventsSeen.has(event.id)) return false;
@@ -2959,7 +2946,6 @@ export class DungeonScene extends Phaser.Scene {
     const weighted = candidates.map((event) => {
       let weight = event.weight;
       if (hpRatio < 0.35 && event.category === 'supply') weight += 8;
-      if (!routeHasSupply && event.category === 'supply') weight += 4;
       if (hpRatio < 0.25 && (event.category === 'penalty' || event.category === 'combat')) weight = Math.max(1, Math.floor(weight * 0.55));
       return { event, weight };
     });
