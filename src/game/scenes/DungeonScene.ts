@@ -9,6 +9,8 @@ type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'dead';
 type RewardRarity = 'common' | 'rare' | 'epic';
 type RewardType = '攻击' | '生存' | '回复' | '技能';
 type RewardTrigger = 'battle' | 'treasure' | 'elite';
+type EnemySpawnDef = EnemyKind | { kind: EnemyKind; elite?: boolean };
+type CombatWave = EnemySpawnDef[];
 type SoundName =
   | 'swing'
   | 'hit'
@@ -705,6 +707,10 @@ export class DungeonScene extends Phaser.Scene {
   private roomSpeedMultiplier = 1;
   private eventCombatGoldReward = 0;
   private eventCombatRareRewardChance = 0;
+  private combatWaves: CombatWave[] = [];
+  private currentWaveIndex = 0;
+  private waveTransitionPending = false;
+  private waveToast?: Phaser.GameObjects.Text;
   private rewardChoiceCount = 0;
   public relicState: PlayerRelicState = this.createDefaultRelicState();
   private epicRewardsTaken = 0;
@@ -927,6 +933,7 @@ export class DungeonScene extends Phaser.Scene {
     this.flowState = 'status';
     this.physics.world.pause();
     this.tweens.pauseAll();
+    this.time.paused = true;
     this.player.setVelocity(0, 0);
     this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
     this.statusPanel?.destroy();
@@ -987,6 +994,7 @@ export class DungeonScene extends Phaser.Scene {
     this.statusPanel?.destroy();
     this.statusPanel = undefined;
     this.flowState = 'playing';
+    this.time.paused = false;
     this.physics.world.resume();
     this.tweens.resumeAll();
   }
@@ -1124,16 +1132,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.updateEnemies(time);
     this.updateBossHazards(time);
-    if (!this.roomCleared && this.currentRoom.enemies.length > 0 && this.countLivingEnemies() === 0) {
-      if (this.currentRoom.kind === 'battle' || this.currentRoom.kind === 'elite') {
-        this.openRewardChoice(this.currentRoom.kind);
-      } else if (this.currentRoom.kind === 'event') {
-        this.grantEventCombatClearBonus();
-        this.openPortal('伏击已清理。传送门已开启，按 E 进入下一房间。');
-      } else {
-        this.openPortal(`${this.getRoomDisplayName()} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
-      }
-    }
+    if (!this.roomCleared && this.currentRoom.enemies.length > 0 && this.countLivingEnemies() === 0) this.handleRoomEnemiesCleared();
     this.updateInvincibleVisual(time);
     this.updateUi(time);
     this.updateUnitHuds();
@@ -1556,9 +1555,14 @@ export class DungeonScene extends Phaser.Scene {
     this.roomTitleToast = undefined;
     this.children.list.filter((child) => child.getData?.('roomObj')).forEach((child) => child.destroy());
     if (this.currentRoom.kind === 'rest' && !this.currentRoom.rewardClaimed) this.currentRoom.isCleared = false;
-    this.drawRoom();
-    this.spawnEnemies();
     this.player.setPosition(170, 320);
+    this.combatWaves = [];
+    this.currentWaveIndex = 0;
+    this.waveTransitionPending = false;
+    this.waveToast?.destroy();
+    this.waveToast = undefined;
+    this.drawRoom();
+    this.spawnInitialRoomEnemies();
     this.applyRoomEntryStatuses();
     this.applyRoomEntryRelics();
     this.showRoomTitle();
@@ -1777,16 +1781,128 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private spawnEnemies() {
-    const spots = this.currentRoom.kind === 'elite'
-      ? [[610, 255], [725, 390], [650, 315], [720, 245]]
-      : [[430, 260], [560, 360], [600, 250], [430, 390]];
-    this.currentRoom.enemies.forEach((kind, index) => {
+  private spawnInitialRoomEnemies() {
+    if (this.currentRoom.kind === 'battle' || this.currentRoom.kind === 'elite') {
+      this.combatWaves = this.buildCombatWaves();
+      this.currentWaveIndex = 0;
+      this.waveTransitionPending = false;
+      this.spawnCurrentWave();
+      return;
+    }
+    this.spawnEnemies(this.currentRoom.enemies);
+  }
+
+  private buildCombatWaves(): CombatWave[] {
+    const depth = this.getDepthRatio();
+    if (this.currentRoom.kind === 'battle') {
+      const waveCount = depth < 0.42 ? 1 : depth < 0.72 ? Phaser.Math.Between(1, 2) : 2;
+      const waves: CombatWave[] = [];
+      waves.push(this.currentRoom.enemies.slice(0, Math.max(2, Math.min(3, this.currentRoom.enemies.length))));
+      if (waveCount >= 2) waves.push(this.pickEnemyMix(depth, 2 + (depth > 0.75 ? 1 : 0)));
+      return waves;
+    }
+
+    const trueEliteRoom = this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳');
+    const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 45 ? 3 : 2;
+    const waves: CombatWave[] = [];
+    waves.push(this.pickEnemyMix(depth, trueEliteRoom ? 3 : 2));
+    if (waveCount >= 2) {
+      waves.push(trueEliteRoom
+        ? [this.pickEliteSpawn(), ...this.pickEnemyMix(depth, 1)]
+        : [...this.pickEnemyMix(depth, 2), Phaser.Math.Between(1, 100) <= 50 ? 'archer' : 'bat']);
+    }
+    if (waveCount >= 3) waves.push([...this.pickEnemyMix(depth, 2), Phaser.Math.Between(1, 100) <= 55 ? 'archer' : 'bat']);
+    return waves;
+  }
+
+  private pickEnemyMix(depth: number, count: number): EnemySpawnDef[] {
+    const pool: EnemyKind[] = depth > 0.68
+      ? ['slime', 'skeleton', 'skeleton', 'bat', 'archer']
+      : depth > 0.42
+        ? ['slime', 'slime', 'skeleton', 'bat', 'archer']
+        : ['slime', 'slime', 'skeleton', 'bat'];
+    return Array.from({ length: count }, () => Phaser.Utils.Array.GetRandom(pool));
+  }
+
+  private pickEliteSpawn(): EnemySpawnDef {
+    const kind = Phaser.Utils.Array.GetRandom<EnemyKind>(['skeleton', 'bat', 'archer']);
+    return { kind, elite: true };
+  }
+
+  private spawnCurrentWave() {
+    const wave = this.combatWaves[this.currentWaveIndex] ?? [];
+    if (wave.length === 0) return;
+    this.spawnEnemies(wave);
+    const waveText = `第 ${this.currentWaveIndex + 1} / ${this.combatWaves.length} 波`;
+    this.showWaveToast(waveText);
+    this.log(this.currentWaveIndex === 0 ? `第 1 波敌人出现。` : `源晶波动增强，第 ${this.currentWaveIndex + 1} 波敌人出现。`);
+  }
+
+  private scheduleNextWave() {
+    if (this.waveTransitionPending) return;
+    this.waveTransitionPending = true;
+    this.log('源晶波动增强，下一波敌人出现！');
+    this.showWaveToast('源晶波动增强，下一波敌人出现！');
+    this.time.delayedCall(Phaser.Math.Between(800, 1200), () => {
+      if (this.runEnded || this.flowState !== 'playing') return;
+      this.currentWaveIndex += 1;
+      this.waveTransitionPending = false;
+      this.spawnCurrentWave();
+    });
+  }
+
+  private handleRoomEnemiesCleared() {
+    if (this.currentRoom.kind === 'battle' || this.currentRoom.kind === 'elite') {
+      if (this.currentWaveIndex < this.combatWaves.length - 1) {
+        this.scheduleNextWave();
+        return;
+      }
+      this.log('所有敌人已清除。');
+      this.openRewardChoice(this.currentRoom.kind);
+      return;
+    }
+    if (this.currentRoom.kind === 'event') {
+      this.grantEventCombatClearBonus();
+      this.openPortal('伏击已清理。传送门已开启，按 E 进入下一房间。');
+      return;
+    }
+    this.openPortal(`${this.getRoomDisplayName()} 已清理。右侧传送门已开启，按 E 进入下一房间。`);
+  }
+
+  private showWaveToast(message: string) {
+    this.waveToast?.destroy();
+    this.waveToast = this.add.text(480, 112, message, {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#8ffcff',
+      stroke: '#07101e',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(96).setAlpha(0);
+    this.tweens.add({
+      targets: this.waveToast,
+      alpha: 1,
+      y: 102,
+      duration: 180,
+      yoyo: true,
+      hold: 760,
+      onComplete: () => {
+        this.waveToast?.destroy();
+        this.waveToast = undefined;
+      }
+    });
+  }
+
+  private spawnEnemies(spawns: EnemySpawnDef[] = this.currentRoom.enemies) {
+    spawns.forEach((spawn, index) => {
+      const kind = typeof spawn === 'string' ? spawn : spawn.kind;
+      const isElite = typeof spawn === 'object' && Boolean(spawn.elite);
       const base = ENEMIES[kind];
-      const [x, y] = kind === 'boss' ? [590, 320] : spots[index] ?? [520, 310];
+      const point = kind === 'boss' ? { x: 590, y: 320 } : this.getWaveSpawnPoint(kind, index);
+      const { x, y } = point;
       const texture = kind === 'slime' ? this.slimeAssetKey('idle_1') : kind === 'skeleton' ? this.skeletonAssetKey('idle_1') : kind === 'bat' ? this.batAssetKey('idle_1') : kind === 'archer' ? this.runeArcherAssetKey('idle_1') : kind === 'boss' ? this.guardianAssetKey('idle_1') : kind;
       const enemy = this.physics.add.sprite(x, y, texture) as Fighter;
-      enemy.setDepth(kind === 'boss' ? 25 : 24).setDisplaySize(kind === 'boss' ? 112 : kind === 'skeleton' ? 42 : kind === 'bat' ? 42 : kind === 'archer' ? 42 : 38, kind === 'boss' ? 126 : kind === 'skeleton' ? 50 : kind === 'bat' ? 34 : kind === 'archer' ? 48 : 38).setCollideWorldBounds(true);
+      enemy.setDepth(kind === 'boss' ? 25 : 24).setCollideWorldBounds(true);
+      this.setEnemyDisplaySize(enemy, kind === 'boss' ? 112 : kind === 'skeleton' ? 42 : kind === 'bat' ? 42 : kind === 'archer' ? 42 : 38, kind === 'boss' ? 126 : kind === 'skeleton' ? 50 : kind === 'bat' ? 34 : kind === 'archer' ? 48 : 38);
       if (kind === 'boss') (enemy.body as Phaser.Physics.Arcade.Body).setSize(70, 70, true);
       if (kind === 'slime') enemy.setData('animFrame', 0).setData('nextAnimAt', 0);
       if (kind === 'skeleton') enemy.setData('animFrame', 0).setData('nextAnimAt', 0).setData('attackingVisual', false);
@@ -1803,17 +1919,60 @@ export class DungeonScene extends Phaser.Scene {
           .setData('shockCharging', false)
           .setData('nextSpike', this.time.now + 2200);
       }
-      const trueElite = this.currentRoom.name.includes('精英') && kind !== 'boss';
-      const eliteBoosted = this.currentRoom.kind === 'elite' && kind !== 'boss';
-      const hp = trueElite ? Math.ceil(base.hp * 1.25) : eliteBoosted ? Math.ceil(base.hp * 1.1) : base.hp;
-      const maxHp = trueElite ? Math.ceil(base.maxHp * 1.25) : eliteBoosted ? Math.ceil(base.maxHp * 1.1) : base.maxHp;
-      const atk = trueElite ? Math.ceil(base.atk * 1.2) : eliteBoosted ? Math.ceil(base.atk * 1.15) : base.atk;
-      const cooldown = trueElite ? Math.round(base.cooldown / 1.15) : eliteBoosted ? Math.round(base.cooldown / 1.1) : base.cooldown;
-      if (trueElite) enemy.setScale(enemy.scaleX * 1.1, enemy.scaleY * 1.1).setTint(0xffe6ad);
-      enemy.stats = { ...base, name: trueElite ? `精英${base.name}` : base.name, hp, maxHp, atk, cooldown, id: `${kind}-${index}-${this.currentRoom.id}`, nextAttack: this.time.now + (trueElite ? 1200 : 1000) };
+      const depthBoost = this.getEnemyDepthBoost();
+      const eliteBoosted = this.currentRoom.kind === 'elite' && kind !== 'boss' && !isElite;
+      const hpMultiplier = kind === 'boss' ? 1 : (isElite ? 2 : eliteBoosted ? 1.18 : 1) * depthBoost.hp;
+      const atkMultiplier = kind === 'boss' ? 1 : (isElite ? 1.5 : eliteBoosted ? 1.12 : 1) * depthBoost.atk;
+      const speedMultiplier = kind === 'boss' ? 1 : isElite ? 1.1 : 1;
+      const cooldown = isElite ? Math.round(base.cooldown / 1.25) : eliteBoosted ? Math.round(base.cooldown / 1.08) : base.cooldown;
+      const hp = Math.ceil(base.hp * hpMultiplier);
+      const maxHp = Math.ceil(base.maxHp * hpMultiplier);
+      const atk = Math.ceil(base.atk * atkMultiplier);
+      if (isElite) {
+        enemy.setData('elite', true).setTint(0xffe6ad);
+        this.setEnemyDisplaySize(enemy, kind === 'skeleton' ? 48 : kind === 'bat' ? 48 : kind === 'archer' ? 48 : 44, kind === 'skeleton' ? 58 : kind === 'bat' ? 40 : kind === 'archer' ? 55 : 44);
+      }
+      enemy.stats = { ...base, name: isElite ? `精英${base.name}` : base.name, hp, maxHp, atk, speed: Math.round(base.speed * speedMultiplier), cooldown, id: `${kind}-${this.currentRoom.id}-${this.currentWaveIndex}-${index}-${this.time.now}`, nextAttack: this.time.now + (isElite ? 1300 : 1000) };
       this.enemies.add(enemy);
       this.createUnitHud(enemy);
     });
+  }
+
+  private getDepthRatio() {
+    return Phaser.Math.Clamp(this.currentRoomIndex / Math.max(1, this.dungeonRoute.length - 1), 0, 1);
+  }
+
+  private getEnemyDepthBoost() {
+    const ratio = this.getDepthRatio();
+    return {
+      hp: 1 + ratio * 0.18,
+      atk: 1 + ratio * 0.12
+    };
+  }
+
+  private getWaveSpawnPoint(kind: EnemyKind, index: number) {
+    const margin = kind === 'archer' ? 46 : 32;
+    const minDistance = kind === 'bat' ? 165 : 190;
+    const candidates = [
+      { x: this.currentRoomBounds.right - 90, y: this.currentRoomBounds.top + 70 },
+      { x: this.currentRoomBounds.right - 120, y: this.currentRoomBounds.bottom - 70 },
+      { x: this.currentRoomBounds.left + 310, y: this.currentRoomBounds.top + 92 },
+      { x: this.currentRoomBounds.left + 360, y: this.currentRoomBounds.bottom - 92 },
+      { x: this.currentRoomBounds.right - 210, y: this.currentRoomBounds.top + 190 },
+      { x: this.currentRoomBounds.left + 440, y: this.currentRoomBounds.bottom - 150 }
+    ].map((point) => this.getLegalPoint(point.x, point.y, margin));
+    const rotated = candidates.slice(index % candidates.length).concat(candidates.slice(0, index % candidates.length));
+    const point = rotated.find((candidate) => (
+      Phaser.Math.Distance.Between(candidate.x, candidate.y, this.player.x, this.player.y) >= minDistance
+      && (!this.doorSprite || Phaser.Math.Distance.Between(candidate.x, candidate.y, this.doorSprite.x, this.doorSprite.y) >= 92)
+    ));
+    if (point) return point;
+    return this.getLegalPoint(this.currentRoomBounds.right - 120, this.currentRoomBounds.top + 80 + index * 56, margin);
+  }
+
+  private setEnemyDisplaySize(enemy: Fighter, width: number, height: number) {
+    const eliteScale = enemy.getData('elite') ? 1.14 : 1;
+    enemy.setDisplaySize(Math.round(width * eliteScale), Math.round(height * eliteScale));
   }
 
   private movePlayer(time: number) {
@@ -2010,9 +2169,10 @@ export class DungeonScene extends Phaser.Scene {
 
   private knockbackEnemy(enemy: Fighter, sourceX: number, sourceY: number, distance: number, stunMs: number) {
     if (!enemy.active || enemy.stats.boss || enemy.getData('dying')) return;
+    const eliteControlScale = enemy.getData('elite') ? 0.58 : 1;
     const angle = Phaser.Math.Angle.Between(sourceX, sourceY, enemy.x, enemy.y);
-    const target = this.getLegalPoint(enemy.x + Math.cos(angle) * distance, enemy.y + Math.sin(angle) * distance, 22);
-    enemy.setData('stunUntil', this.time.now + stunMs);
+    const target = this.getLegalPoint(enemy.x + Math.cos(angle) * distance * eliteControlScale, enemy.y + Math.sin(angle) * distance * eliteControlScale, 22);
+    enemy.setData('stunUntil', this.time.now + stunMs * eliteControlScale);
     enemy.setData('attackCharging', false);
     enemy.setVelocity(0, 0);
     this.tweens.add({
@@ -2171,7 +2331,8 @@ export class DungeonScene extends Phaser.Scene {
     if (enemy.getData('attackCharging')) return;
     enemy.setData('attackCharging', true);
     enemy.setVelocity(0, 0);
-    enemy.setTexture(this.skeletonAssetKey('attack')).setDisplaySize(44, 52);
+    enemy.setTexture(this.skeletonAssetKey('attack'));
+    this.setEnemyDisplaySize(enemy, 44, 52);
     enemy.setTint(0xf4f0df);
     this.time.delayedCall(300, () => {
       if (!enemy.active || enemy.getData('dying')) return;
@@ -2256,7 +2417,8 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('animFrame', frameIndex);
     enemy.setData('nextAnimAt', time + (moving ? 180 : 360));
     const frame: SlimeFrame = moving ? frameIndex === 0 ? 'move_1' : 'move_2' : frameIndex === 0 ? 'idle_1' : 'idle_2';
-    enemy.setTexture(this.slimeAssetKey(frame)).setDisplaySize(38, moving ? 40 : 38);
+    enemy.setTexture(this.slimeAssetKey(frame));
+    this.setEnemyDisplaySize(enemy, 38, moving ? 40 : 38);
     if (!this.hasGeneratedSlime(frame)) enemy.setRotation(0);
   }
 
@@ -2268,13 +2430,15 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('animFrame', frameIndex);
     enemy.setData('nextAnimAt', time + (moving ? 210 : 430));
     const frame: SkeletonFrame = moving ? frameIndex === 0 ? 'walk_1' : 'walk_2' : frameIndex === 0 ? 'idle_1' : 'idle_2';
-    enemy.setTexture(this.skeletonAssetKey(frame)).setDisplaySize(42, 50);
+    enemy.setTexture(this.skeletonAssetKey(frame));
+    this.setEnemyDisplaySize(enemy, 42, 50);
     if (!this.hasGeneratedSkeleton(frame)) enemy.setRotation(0);
   }
 
   private showSkeletonAttack(enemy: Fighter) {
     enemy.setData('attackingVisual', true);
-    enemy.setTexture(this.skeletonAssetKey('attack')).setDisplaySize(44, 52);
+    enemy.setTexture(this.skeletonAssetKey('attack'));
+    this.setEnemyDisplaySize(enemy, 44, 52);
     const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
     const slashX = enemy.x + Math.cos(angle) * 30;
     const slashY = enemy.y + Math.sin(angle) * 30;
@@ -2284,7 +2448,8 @@ export class DungeonScene extends Phaser.Scene {
     this.time.delayedCall(180, () => {
       if (!enemy.active || enemy.getData('dying')) return;
       enemy.setData('attackingVisual', false);
-      enemy.setTexture(this.skeletonAssetKey('idle_1')).setDisplaySize(42, 50);
+      enemy.setTexture(this.skeletonAssetKey('idle_1'));
+      this.setEnemyDisplaySize(enemy, 42, 50);
     });
   }
 
@@ -2298,13 +2463,15 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('animFrame', frameIndex);
     enemy.setData('nextAnimAt', time + (moving ? 115 : 280));
     const frame: BatFrame = moving ? frameIndex === 0 ? 'fly_1' : 'fly_2' : frameIndex === 0 ? 'idle_1' : 'idle_2';
-    enemy.setTexture(this.batAssetKey(frame)).setDisplaySize(42, 34);
+    enemy.setTexture(this.batAssetKey(frame));
+    this.setEnemyDisplaySize(enemy, 42, 34);
     if (!this.hasGeneratedBat(frame)) enemy.setRotation(0);
   }
 
   private showBatAttack(enemy: Fighter) {
     enemy.setData('attackingVisual', true);
-    enemy.setTexture(this.batAssetKey('attack')).setDisplaySize(44, 36);
+    enemy.setTexture(this.batAssetKey('attack'));
+    this.setEnemyDisplaySize(enemy, 44, 36);
     const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
     const x = enemy.x + Math.cos(angle) * 27;
     const y = enemy.y + Math.sin(angle) * 27;
@@ -2316,7 +2483,8 @@ export class DungeonScene extends Phaser.Scene {
     this.time.delayedCall(150, () => {
       if (!enemy.active || enemy.getData('dying')) return;
       enemy.setData('attackingVisual', false);
-      enemy.setTexture(this.batAssetKey('idle_1')).setDisplaySize(42, 34);
+      enemy.setTexture(this.batAssetKey('idle_1'));
+      this.setEnemyDisplaySize(enemy, 42, 34);
     });
   }
 
@@ -2327,25 +2495,34 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('animFrame', frameIndex);
     enemy.setData('nextAnimAt', time + 430);
     const frame: RuneArcherFrame = frameIndex === 0 ? 'idle_1' : 'idle_2';
-    enemy.setTexture(this.runeArcherAssetKey(frame)).setDisplaySize(42, 48);
+    enemy.setTexture(this.runeArcherAssetKey(frame));
+    this.setEnemyDisplaySize(enemy, 42, 48);
     if (!this.hasGeneratedRuneArcher(frame)) enemy.setRotation(0);
   }
 
   private showRuneArcherCast(enemy: Fighter) {
     enemy.setData('castingVisual', true);
-    enemy.setTexture(this.runeArcherAssetKey('cast_1')).setDisplaySize(42, 48);
+    enemy.setTexture(this.runeArcherAssetKey('cast_1'));
+    this.setEnemyDisplaySize(enemy, 42, 48);
     const ring = this.add.circle(enemy.x + 16, enemy.y - 4, 18, 0x615bff, 0.12).setStrokeStyle(2, 0x8ffcff, 0.78).setDepth(27);
     this.tweens.add({ targets: ring, scale: 1.56, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
     this.time.delayedCall(90, () => {
-      if (enemy.active && !enemy.getData('dying')) enemy.setTexture(this.runeArcherAssetKey('cast_2')).setDisplaySize(42, 48);
+      if (enemy.active && !enemy.getData('dying')) {
+        enemy.setTexture(this.runeArcherAssetKey('cast_2'));
+        this.setEnemyDisplaySize(enemy, 42, 48);
+      }
     });
     this.time.delayedCall(170, () => {
-      if (enemy.active && !enemy.getData('dying')) enemy.setTexture(this.runeArcherAssetKey('attack')).setDisplaySize(44, 50);
+      if (enemy.active && !enemy.getData('dying')) {
+        enemy.setTexture(this.runeArcherAssetKey('attack'));
+        this.setEnemyDisplaySize(enemy, 44, 50);
+      }
     });
     this.time.delayedCall(300, () => {
       if (!enemy.active || enemy.getData('dying')) return;
       enemy.setData('castingVisual', false);
-      enemy.setTexture(this.runeArcherAssetKey('idle_1')).setDisplaySize(42, 48);
+      enemy.setTexture(this.runeArcherAssetKey('idle_1'));
+      this.setEnemyDisplaySize(enemy, 42, 48);
     });
   }
 
@@ -2464,7 +2641,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private fireEnemyProjectile(enemy: Fighter, spread: boolean) {
     if (!enemy.active || this.runEnded) return;
-    const shots = spread ? [-12, 0, 12] : [0];
+    const shots = spread ? [-12, 0, 12] : enemy.getData('elite') && enemy.stats.kind === 'archer' ? [-7, 7] : [0];
     shots.forEach((offset) => {
       const isRuneProjectile = enemy.stats.kind === 'archer';
       const isBossProjectile = Boolean(enemy.stats.boss);
@@ -2606,7 +2783,9 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setTint(enemy.stats.kind === 'slime' ? 0xeaffff : enemy.stats.kind === 'skeleton' ? 0xffdddd : enemy.stats.kind === 'bat' ? 0xf0d2ff : enemy.stats.kind === 'archer' ? 0xded8ff : enemy.stats.boss ? 0xf1fbff : 0xffffff);
     if (enemy.stats.kind === 'slime') enemy.setAlpha(1);
     this.time.delayedCall(95, () => {
-      if (enemy.active) enemy.clearTint();
+      if (!enemy.active) return;
+      enemy.clearTint();
+      if (enemy.getData('elite')) enemy.setTint(0xffe6ad);
     });
     if (enemy.stats.hp <= 0) this.killEnemy(enemy);
   }
@@ -2630,7 +2809,7 @@ export class DungeonScene extends Phaser.Scene {
     if (enemy.stats.kind === 'bat') this.spawnBatSmoke(enemy.x, enemy.y);
     if (enemy.stats.kind === 'archer') this.spawnRuneShards(enemy.x, enemy.y);
     if (wasBoss) this.spawnGuardianDeath(enemy.x, enemy.y);
-    if (name.startsWith('精英')) this.showRewardParticles('epic');
+    if (enemy.getData('elite') || name.startsWith('精英')) this.showRewardParticles('epic');
     this.tweens.add({
       targets: enemy,
       alpha: 0,
@@ -3242,6 +3421,7 @@ export class DungeonScene extends Phaser.Scene {
     ]);
     this.roomText.setText([
       `${this.currentRoomIndex + 1}/${this.dungeonRoute.length} ${this.getRoomDisplayName()}`,
+      this.getWaveHudText(),
       this.getContextHint(),
       this.getNearbyBranchHint(),
     ].filter(Boolean));
@@ -3259,6 +3439,12 @@ export class DungeonScene extends Phaser.Scene {
     if (this.currentRoom.kind === 'treasure') return '传送门：打开封尘宝库后开启';
     if (this.currentRoom.kind === 'event') return '传送门：完成事件后开启';
     return '传送门：清除敌人后开启';
+  }
+
+  private getWaveHudText() {
+    if (this.roomCleared || this.combatWaves.length <= 1) return '';
+    if (this.currentRoom.kind !== 'battle' && this.currentRoom.kind !== 'elite') return '';
+    return `第 ${this.currentWaveIndex + 1} / ${this.combatWaves.length} 波`;
   }
 
   private getNearbyBranchHint() {
@@ -3393,11 +3579,12 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private createUnitHud(fighter: Fighter) {
-    const width = fighter.stats.boss ? 104 : fighter.stats.kind === 'player' ? 58 : 52;
+    const elite = Boolean(fighter.getData?.('elite'));
+    const width = fighter.stats.boss ? 104 : fighter.stats.kind === 'player' ? 58 : elite ? 64 : 52;
     const hud: UnitHud = {
-      name: this.add.text(fighter.x, fighter.y - 44, fighter.stats.name, { fontFamily: 'monospace', fontSize: '12px', color: '#eaffff', stroke: '#07101e', strokeThickness: 3 }).setOrigin(0.5).setDepth(70),
+      name: this.add.text(fighter.x, fighter.y - 44, fighter.stats.name, { fontFamily: 'monospace', fontSize: elite ? '13px' : '12px', color: elite ? '#ffe6ad' : '#eaffff', stroke: '#07101e', strokeThickness: 3 }).setOrigin(0.5).setDepth(70),
       hpBg: this.add.rectangle(fighter.x, fighter.y - 28, width, 6, 0x250c18).setDepth(69),
-      hpFill: this.add.rectangle(fighter.x - width / 2, fighter.y - 28, width, 6, fighter.stats.kind === 'player' ? 0x35e7c4 : 0xff5f7d).setOrigin(0, 0.5).setDepth(70)
+      hpFill: this.add.rectangle(fighter.x - width / 2, fighter.y - 28, width, 6, fighter.stats.kind === 'player' ? 0x35e7c4 : elite ? 0xffc24d : 0xff5f7d).setOrigin(0, 0.5).setDepth(70)
     };
     this.unitHuds.set(fighter.stats.id, hud);
   }
@@ -3407,7 +3594,8 @@ export class DungeonScene extends Phaser.Scene {
     fighters.forEach((fighter) => {
       const hud = this.unitHuds.get(fighter.stats.id);
       if (!hud) return;
-      const width = fighter.stats.boss ? 104 : fighter.stats.kind === 'player' ? 58 : 52;
+      const elite = Boolean(fighter.getData?.('elite'));
+      const width = fighter.stats.boss ? 104 : fighter.stats.kind === 'player' ? 58 : elite ? 64 : 52;
       const yOffset = fighter.stats.boss ? 62 : 28;
       hud.name.setPosition(fighter.x, fighter.y - (fighter.stats.boss ? 82 : 42));
       hud.hpBg.setPosition(fighter.x, fighter.y - yOffset);
