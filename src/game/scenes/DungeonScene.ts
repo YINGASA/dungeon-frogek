@@ -4,13 +4,37 @@ import { storageService } from '../../services/storageService';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'start' | 'battle' | 'treasure' | 'event' | 'elite' | 'rest' | 'boss';
-type GameFlowState = 'title' | 'playing' | 'paused' | 'reward' | 'event' | 'status' | 'ended';
+type GameFlowState = 'title' | 'weapon' | 'playing' | 'paused' | 'reward' | 'event' | 'status' | 'ended';
 type PlayerActionState = 'normal' | 'attacking' | 'dashing' | 'dead';
 type RewardRarity = 'common' | 'rare' | 'epic';
 type RewardType = '攻击' | '生存' | '回复' | '技能';
 type RewardTrigger = 'battle' | 'treasure' | 'elite';
 type EnemySpawnDef = EnemyKind | { kind: EnemyKind; elite?: boolean };
 type CombatWave = EnemySpawnDef[];
+type WeaponId = 'short-sword' | 'heavy-blade' | 'spear' | 'dual-daggers';
+
+interface WeaponConfig {
+  id: WeaponId;
+  name: string;
+  role: string;
+  description: string;
+  pros: string;
+  cons: string;
+  attackDamageMultiplier: number;
+  attackRange: number;
+  attackWidth: number;
+  attackCooldown: number;
+  knockbackPower: number;
+  dashDamageMultiplier: number;
+  dashDistanceMultiplier: number;
+  dashCooldownMultiplier: number;
+  dashHitRadius: number;
+  moveSpeedMultiplier: number;
+  attackColor: number;
+  attackAlpha: number;
+  specialText: string;
+  styleSummary: string;
+}
 type SoundName =
   | 'swing'
   | 'hit'
@@ -180,6 +204,99 @@ const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
     { name: '首领房', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
   ]
 };
+
+const WEAPONS: WeaponConfig[] = [
+  {
+    id: 'short-sword',
+    name: '短剑',
+    role: '均衡稳定',
+    description: '当前默认手感，攻击、击退和冲刺斩都保持标准。',
+    pros: '手感稳定，容错较高',
+    cons: '没有突出的爆发或距离优势',
+    attackDamageMultiplier: 1,
+    attackRange: 62,
+    attackWidth: 38,
+    attackCooldown: 330,
+    knockbackPower: 32,
+    dashDamageMultiplier: 1,
+    dashDistanceMultiplier: 1,
+    dashCooldownMultiplier: 1,
+    dashHitRadius: 44,
+    moveSpeedMultiplier: 1,
+    attackColor: 0xffffff,
+    attackAlpha: 0.26,
+    specialText: '普通攻击：标准｜冲刺斩：标准',
+    styleSummary: '均衡稳定 / 标准作战'
+  },
+  {
+    id: 'heavy-blade',
+    name: '重刃',
+    role: '爆发击退',
+    description: '打得更痛，攻击节奏更慢，适合抓时机爆发。',
+    pros: '伤害高，击退强，冲刺斩更重',
+    cons: '攻速慢，移动略慢，冲刺冷却略长',
+    attackDamageMultiplier: 1.3,
+    attackRange: 72,
+    attackWidth: 50,
+    attackCooldown: 415,
+    knockbackPower: 43,
+    dashDamageMultiplier: 1.25,
+    dashDistanceMultiplier: 0.96,
+    dashCooldownMultiplier: 1.1,
+    dashHitRadius: 50,
+    moveSpeedMultiplier: 0.95,
+    attackColor: 0xffd28a,
+    attackAlpha: 0.3,
+    specialText: '普通攻击：高伤 / 慢速｜冲刺斩：重击',
+    styleSummary: '高伤爆发 / 强击退'
+  },
+  {
+    id: 'spear',
+    name: '长枪',
+    role: '远距穿刺',
+    description: '攻击距离更远但判定更窄，适合拉扯。',
+    pros: '攻击距离长，冲刺斩距离更远',
+    cons: '近身被围时判定不如短剑舒服',
+    attackDamageMultiplier: 0.95,
+    attackRange: 84,
+    attackWidth: 26,
+    attackCooldown: 330,
+    knockbackPower: 32,
+    dashDamageMultiplier: 1,
+    dashDistanceMultiplier: 1.2,
+    dashCooldownMultiplier: 1,
+    dashHitRadius: 36,
+    moveSpeedMultiplier: 1,
+    attackColor: 0x8ffcff,
+    attackAlpha: 0.24,
+    specialText: '普通攻击：长距离 / 窄判定｜冲刺斩：更远',
+    styleSummary: '远距离穿刺 / 拉扯输出'
+  },
+  {
+    id: 'dual-daggers',
+    name: '双匕',
+    role: '高频贴身',
+    description: '攻击频率高但范围短，需要更主动地贴近敌人。',
+    pros: '攻速快，冲刺斩冷却短，移动更灵活',
+    cons: '单次伤害低，攻击短，击退较弱',
+    attackDamageMultiplier: 0.75,
+    attackRange: 50,
+    attackWidth: 30,
+    attackCooldown: 230,
+    knockbackPower: 24,
+    dashDamageMultiplier: 0.9,
+    dashDistanceMultiplier: 1,
+    dashCooldownMultiplier: 0.8,
+    dashHitRadius: 40,
+    moveSpeedMultiplier: 1.08,
+    attackColor: 0xd9b8ff,
+    attackAlpha: 0.28,
+    specialText: '普通攻击：快速 / 短距｜冲刺斩：高频',
+    styleSummary: '快速连击 / 贴身输出'
+  }
+];
+
+const DEFAULT_WEAPON = WEAPONS[0];
 
 const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = {
   slime: { name: '晶化史莱姆', kind: 'slime', hp: 25, maxHp: 25, atk: 7, def: 0, speed: 55, range: 30, cooldown: 1100 },
@@ -653,6 +770,7 @@ export class DungeonScene extends Phaser.Scene {
   private hudPanel?: Phaser.GameObjects.Container;
   private titlePanel?: Phaser.GameObjects.Container;
   private pausePanel?: Phaser.GameObjects.Container;
+  private weaponPanel?: Phaser.GameObjects.Container;
   private statusPanel?: Phaser.GameObjects.Container;
   private settlementPanel?: Phaser.GameObjects.Container;
   private rewardPanel?: Phaser.GameObjects.Container;
@@ -685,6 +803,7 @@ export class DungeonScene extends Phaser.Scene {
   private visitedRoomIds: string[] = [];
   private enteredRoomNumbers = new Map<string, number>();
   private currentRoom = this.createRouteRoom(ROOM_TEMPLATES.start[0], 0);
+  private selectedWeapon: WeaponConfig = DEFAULT_WEAPON;
   private roomCleared = false;
   private rewardTaken = false;
   private runEnded = false;
@@ -772,7 +891,7 @@ export class DungeonScene extends Phaser.Scene {
     this.resetRunState();
     this.createTextures();
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,I,ESC,R,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,I,ESC,R,ONE,TWO,THREE,FOUR') as Record<string, Phaser.Input.Keyboard.Key>;
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
     this.walls = this.physics.add.staticGroup();
@@ -827,7 +946,7 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5));
     const startButton = this.createMenuButton(0, 0, 210, '开始游戏', () => {
       void this.sfx.init();
-      this.startGame();
+      this.showWeaponSelection();
     });
     const helpButton = this.createMenuButton(0, 66, 210, '操作说明', () => this.showControlHelp());
     this.titlePanel.add(startButton);
@@ -945,9 +1064,9 @@ export class DungeonScene extends Phaser.Scene {
     this.statusPanel.add(this.add.text(-340, -165, '基础属性', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
     this.statusPanel.add(this.add.text(-340, -137, this.getStatusBasicLines(), {
       fontFamily: 'monospace',
-      fontSize: '14px',
+      fontSize: '13px',
       color: '#dff7ff',
-      lineSpacing: 5,
+      lineSpacing: 3,
       wordWrap: { width: 330 }
     }));
 
@@ -1007,6 +1126,8 @@ export class DungeonScene extends Phaser.Scene {
       `DEF：${this.player.stats.def}`,
       `金币：${this.gold}`,
       `遗物：${this.relicState.relics.length}`,
+      `当前武器：${this.selectedWeapon.name}｜${this.selectedWeapon.role}`,
+      `${this.selectedWeapon.specialText}`,
       `当前房间：第 ${this.getDisplayRoomNumber()} / ${this.getDisplayTotalRooms()} 房`,
       `房间类型：${this.getRoomTypeLabel()}`
     ].join('\n');
@@ -1054,7 +1175,7 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.resumeAll();
     this.physics.world.resume();
     this.setWorldVisible(true);
-    this.startGame();
+    this.showWeaponSelection();
   }
 
   private returnToTitle() {
@@ -1084,6 +1205,13 @@ export class DungeonScene extends Phaser.Scene {
 
   update(time: number) {
     if (this.flowState === 'title') return;
+    if (this.flowState === 'weapon') {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.chooseWeapon(0);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.chooseWeapon(1);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.chooseWeapon(2);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.FOUR)) this.chooseWeapon(3);
+      return;
+    }
     if (this.flowState === 'ended' || this.runEnded) {
       if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
       return;
@@ -2028,7 +2156,7 @@ export class DungeonScene extends Phaser.Scene {
         if (this.hasGeneratedHunter(this.playerDirection, 'idle')) this.player.setRotation(0);
       }
     }
-    const speed = this.player.stats.speed * this.relicState.moveSpeedMultiplier * this.roomSpeedMultiplier;
+    const speed = this.player.stats.speed * this.selectedWeapon.moveSpeedMultiplier * this.relicState.moveSpeedMultiplier * this.roomSpeedMultiplier;
     this.player.setVelocity(direction.x * speed, direction.y * speed);
   }
 
@@ -2057,12 +2185,14 @@ export class DungeonScene extends Phaser.Scene {
   private normalAttack(time: number) {
     if (this.playerActionState === 'dashing' || this.playerActionState === 'dead') return;
     if (time < this.skillCooldowns.attack) return;
+    const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
     this.playerActionState = 'attacking';
-    this.skillCooldowns.attack = time + 330;
+    this.skillCooldowns.attack = time + weapon.attackCooldown;
     this.sfx.play('swing');
-    this.showAttackArc(64, 0xffffff, 0.26);
-    this.hitInArc(this.player.stats.atk + this.relicState.bonusDamage, 62, '普通攻击', 60, 32, 220);
-    this.time.delayedCall(150, () => {
+    this.showWeaponAttackEffect(weapon);
+    const rawDamage = Math.round((this.player.stats.atk + this.relicState.bonusDamage) * weapon.attackDamageMultiplier);
+    this.hitInArc(rawDamage, weapon.attackRange, '普通攻击', 60, weapon.knockbackPower, 220, weapon.attackWidth);
+    this.time.delayedCall(Math.min(190, Math.round(weapon.attackCooldown * 0.45)), () => {
       if (this.playerActionState === 'attacking') this.playerActionState = 'normal';
     });
   }
@@ -2073,6 +2203,7 @@ export class DungeonScene extends Phaser.Scene {
       this.log('冲刺斩还在冷却。');
       return;
     }
+    const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
     this.skillCooldowns.dashSlash = time + this.getDashCooldownMs();
     this.skillUses += 1;
     this.sfx.play('swing');
@@ -2082,7 +2213,7 @@ export class DungeonScene extends Phaser.Scene {
     const startX = this.player.x;
     const startY = this.player.y;
     this.relicState.dashCooldownRefunded = false;
-    const dashDistance = 140 * this.relicState.dashDistanceMultiplier;
+    const dashDistance = 140 * weapon.dashDistanceMultiplier * this.relicState.dashDistanceMultiplier;
     const target = this.getLegalPoint(startX + this.lastFacing.x * dashDistance, startY + this.lastFacing.y * dashDistance, 18);
     this.player.setVelocity(0, 0);
     this.showDashSlashTrail(startX, startY, target.x, target.y);
@@ -2119,10 +2250,26 @@ export class DungeonScene extends Phaser.Scene {
     this.log('护盾启动：3 秒内受到伤害减少 50%。');
   }
 
-  private showAttackArc(range: number, color: number, alpha: number) {
+  private showWeaponAttackEffect(weapon: WeaponConfig) {
+    if (weapon.id === 'dual-daggers') {
+      this.showAttackArc(weapon.attackRange, weapon.attackColor, weapon.attackAlpha, 0.62, -18);
+      this.time.delayedCall(55, () => this.showAttackArc(weapon.attackRange * 0.9, weapon.attackColor, weapon.attackAlpha, 0.62, 18));
+      return;
+    }
+    if (weapon.id === 'spear') {
+      const start = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(18));
+      const end = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(weapon.attackRange));
+      const line = this.add.line(0, 0, start.x, start.y, end.x, end.y, weapon.attackColor, 0.48).setOrigin(0).setLineWidth(5).setDepth(28);
+      this.tweens.add({ targets: line, alpha: 0, duration: 170, onComplete: () => line.destroy() });
+      return;
+    }
+    this.showAttackArc(weapon.attackRange, weapon.attackColor, weapon.attackAlpha, weapon.id === 'heavy-blade' ? 0.58 : 0.42);
+  }
+
+  private showAttackArc(range: number, color: number, alpha: number, radiusScale = 0.42, angleOffset = 0) {
     const center = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(range * 0.36));
-    const arc = this.add.arc(center.x, center.y, range * 0.42, -42, 42, false, color, alpha).setStrokeStyle(4, color, 0.9).setDepth(28);
-    arc.setRotation(Phaser.Math.Angle.Between(0, 0, this.lastFacing.x, this.lastFacing.y));
+    const arc = this.add.arc(center.x, center.y, range * radiusScale, -42, 42, false, color, alpha).setStrokeStyle(4, color, 0.9).setDepth(28);
+    arc.setRotation(Phaser.Math.Angle.Between(0, 0, this.lastFacing.x, this.lastFacing.y) + Phaser.Math.DegToRad(angleOffset));
     this.tweens.add({ targets: arc, alpha: 0, scale: 1.18, duration: 190, onComplete: () => arc.destroy() });
   }
 
@@ -2132,14 +2279,17 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.add({ targets: trail, alpha: 0, scale: 0.72, duration: 260, onComplete: () => trail.destroy() });
   }
 
-  private hitInArc(rawDamage: number, range: number, source: string, hitStopMs: number, knockbackDistance = 0, stunMs = 0) {
-    const center = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(range * 0.58));
+  private hitInArc(rawDamage: number, range: number, source: string, hitStopMs: number, knockbackDistance = 0, stunMs = 0, width = range * 0.58) {
     let hit = false;
     const knockedNames: string[] = [];
     this.enemies.getChildren().forEach((object) => {
       const enemy = object as Fighter;
       if (!enemy.active) return;
-      if (Phaser.Math.Distance.Between(center.x, center.y, enemy.x, enemy.y) <= range) {
+      const toEnemy = new Phaser.Math.Vector2(enemy.x - this.player.x, enemy.y - this.player.y);
+      const forward = toEnemy.dot(this.lastFacing);
+      const perpendicular = Math.abs(toEnemy.x * this.lastFacing.y - toEnemy.y * this.lastFacing.x);
+      const enemyAllowance = enemy.stats.boss ? 34 : 18;
+      if (forward >= 4 && forward <= range + enemyAllowance && perpendicular <= width + enemyAllowance) {
         this.damageEnemy(enemy, rawDamage);
         if (!enemy.stats.boss && knockbackDistance > 0) {
           this.knockbackEnemy(enemy, this.player.x, this.player.y, knockbackDistance, stunMs);
@@ -2180,7 +2330,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getDashCooldownMs() {
-    return Math.max(3000, Math.round(5000 * (1 - this.relicState.cooldownReduction)));
+    return Math.max(2200, Math.round(5000 * this.selectedWeapon.dashCooldownMultiplier * (1 - this.relicState.cooldownReduction)));
   }
 
   private getShieldCooldownMs() {
@@ -2218,7 +2368,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private showDashSlashTrail(startX: number, startY: number, endX: number, endY: number) {
     this.dashLine?.destroy();
-    this.dashLine = this.add.line(0, 0, startX, startY, endX, endY, 0x67f4ff, 0.34).setOrigin(0).setLineWidth(8).setDepth(27);
+    const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
+    this.dashLine = this.add.line(0, 0, startX, startY, endX, endY, weapon.attackColor, 0.34).setOrigin(0).setLineWidth(weapon.id === 'heavy-blade' ? 12 : weapon.id === 'spear' ? 5 : 8).setDepth(27);
     this.tweens.add({
       targets: this.dashLine,
       alpha: 0,
@@ -2236,9 +2387,10 @@ export class DungeonScene extends Phaser.Scene {
     this.enemies.getChildren().forEach((object) => {
       const enemy = object as Fighter;
       if (!enemy.active || enemy.getData('dying') || this.dashHitEnemies.has(enemy.stats.id)) return;
-      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) > (enemy.stats.boss ? 72 : 44)) return;
+      const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
+      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) > (enemy.stats.boss ? Math.max(72, weapon.dashHitRadius + 28) : weapon.dashHitRadius)) return;
       this.dashHitEnemies.add(enemy.stats.id);
-      const rawDamage = Math.round((this.player.stats.atk + this.relicState.bonusDamage) * 1.5 * this.relicState.dashDamageMultiplier);
+      const rawDamage = Math.round((this.player.stats.atk + this.relicState.bonusDamage) * 1.5 * weapon.dashDamageMultiplier * this.relicState.dashDamageMultiplier);
       this.dashDamageTotal += Math.max(1, rawDamage - enemy.stats.def);
       this.damageEnemy(enemy, rawDamage, true);
       if (this.hasRelic('echo-core') && !this.relicState.dashCooldownRefunded) {
@@ -2246,7 +2398,7 @@ export class DungeonScene extends Phaser.Scene {
         this.relicState.dashCooldownRefunded = true;
         this.showFloatingText(this.player.x, this.player.y - 64, '回响核心 -1s', '#d9b8ff');
       }
-      if (!enemy.stats.boss) this.knockbackEnemy(enemy, this.player.x - this.lastFacing.x * 24, this.player.y - this.lastFacing.y * 24, 62, 320);
+      if (!enemy.stats.boss) this.knockbackEnemy(enemy, this.player.x - this.lastFacing.x * 24, this.player.y - this.lastFacing.y * 24, 62 * (weapon.id === 'heavy-blade' ? 1.2 : weapon.id === 'dual-daggers' ? 0.8 : 1), 320);
       else this.startHitStop(95);
       hits += 1;
     });
@@ -3269,6 +3421,63 @@ export class DungeonScene extends Phaser.Scene {
     return button;
   }
 
+  private showWeaponSelection() {
+    this.titlePanel?.destroy();
+    this.titlePanel = undefined;
+    this.settlementPanel?.destroy();
+    this.settlementPanel = undefined;
+    this.weaponPanel?.destroy();
+    this.flowState = 'weapon';
+    this.gameReady = false;
+    this.time.paused = false;
+    this.physics.world.pause();
+    this.setGameplayUiVisible(false);
+    this.setWorldVisible(false);
+
+    this.weaponPanel = this.add.container(480, 300).setDepth(225);
+    this.weaponPanel.add(this.add.rectangle(0, 0, 820, 500, 0x07101e, 0.97).setStrokeStyle(2, 0x35e7c4, 0.95));
+    this.weaponPanel.add(this.add.text(0, -220, '选择初始武器', { fontFamily: 'monospace', fontSize: '32px', color: '#ffffff' }).setOrigin(0.5));
+    this.weaponPanel.add(this.add.text(0, -188, '本局武器固定。按 1 / 2 / 3 / 4 或点击卡牌选择。', { fontFamily: 'monospace', fontSize: '15px', color: '#8ffcff' }).setOrigin(0.5));
+    WEAPONS.forEach((weapon, index) => {
+      this.weaponPanel?.add(this.createWeaponCard(weapon, index));
+    });
+  }
+
+  private createWeaponCard(weapon: WeaponConfig, index: number) {
+    const x = -300 + index * 200;
+    const card = this.add.container(x, 28);
+    const rect = this.add.rectangle(0, 0, 176, 330, 0x0b1628, 0.96).setStrokeStyle(2, weapon.attackColor, 0.92).setInteractive({ useHandCursor: true });
+    rect.on('pointerover', () => rect.setFillStyle(0x10233a, 0.98));
+    rect.on('pointerout', () => rect.setFillStyle(0x0b1628, 0.96));
+    rect.on('pointerdown', () => this.chooseWeapon(index));
+    card.add(rect);
+    card.add(this.add.text(-76, -146, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
+    card.add(this.add.text(0, -128, weapon.name, { fontFamily: 'monospace', fontSize: '24px', color: '#ffffff' }).setOrigin(0.5));
+    card.add(this.add.text(0, -98, weapon.role, { fontFamily: 'monospace', fontSize: '14px', color: '#8ffcff' }).setOrigin(0.5));
+    card.add(this.add.text(-70, -70, weapon.description, { fontFamily: 'monospace', fontSize: '11px', color: '#dff7ff', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
+    card.add(this.add.text(-70, -18, `优点：${weapon.pros}`, { fontFamily: 'monospace', fontSize: '11px', color: '#ffe6ad', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
+    card.add(this.add.text(-70, 38, `缺点：${weapon.cons}`, { fontFamily: 'monospace', fontSize: '11px', color: '#ffb0b0', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
+    card.add(this.add.text(-70, 94, this.getWeaponStatText(weapon), { fontFamily: 'monospace', fontSize: '10px', color: '#eaffff', wordWrap: { width: 142, useAdvancedWrap: true }, lineSpacing: 1 }));
+    return card;
+  }
+
+  private getWeaponStatText(weapon: WeaponConfig) {
+    return [
+      `伤害 ${Math.round(weapon.attackDamageMultiplier * 100)}%  范围 ${weapon.attackRange}`,
+      `冷却 ${weapon.attackCooldown}ms  击退 ${weapon.knockbackPower}`,
+      `K伤害 ${Math.round(weapon.dashDamageMultiplier * 100)}%  K距离 ${Math.round(weapon.dashDistanceMultiplier * 100)}%`,
+      `K冷却 ${Math.round(weapon.dashCooldownMultiplier * 100)}%  移速 ${Math.round(weapon.moveSpeedMultiplier * 100)}%`
+    ].join('\n');
+  }
+
+  private chooseWeapon(index: number) {
+    const weapon = WEAPONS[index] ?? DEFAULT_WEAPON;
+    this.selectedWeapon = weapon;
+    this.weaponPanel?.destroy();
+    this.weaponPanel = undefined;
+    this.startGame();
+  }
+
   private resolveActiveEvent() {
     if (this.flowState !== 'event' || !this.activeEvent) return;
     const event = this.activeEvent;
@@ -3441,6 +3650,7 @@ export class DungeonScene extends Phaser.Scene {
       `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ""}`,
       `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
       `Gold ${this.gold}    Relics ${this.relicState.relics.length}`,
+      `Weapon ${this.selectedWeapon.name}`,
       `Status ${statuses}`,
       `Recent ${recentRelics}`
     ]);
@@ -3750,7 +3960,10 @@ export class DungeonScene extends Phaser.Scene {
       negativeEvents: this.eventStats.negative,
       combatEvents: this.eventStats.combat,
       wasPoisoned: this.eventStats.poisoned,
-      wasCursed: this.eventStats.cursed
+      wasCursed: this.eventStats.cursed,
+      weaponId: this.selectedWeapon.id,
+      weaponName: this.selectedWeapon.name,
+      weaponStyle: this.selectedWeapon.styleSummary
     };
     storageService.saveRun(run);
     this.setGameplayUiVisible(false);
@@ -3771,6 +3984,7 @@ export class DungeonScene extends Phaser.Scene {
       `Rooms: ${visitedRooms.length}  Events: ${this.eventStats.triggered}  Elite Rooms: ${this.getEliteRoomsVisited()}`,
       `Negative Events: ${this.eventStats.negative}  Combat Events: ${this.eventStats.combat}`,
       `Statuses: ${this.eventStats.poisoned ? 'Poisoned' : 'No poison'} / ${this.eventStats.cursed ? 'Cursed' : 'No curse'}`,
+      `Weapon: ${this.selectedWeapon.name}  Style: ${this.selectedWeapon.styleSummary}`,
       `Reward Choices: ${this.rewardChoiceCount}  Relics: ${this.relicState.relics.length}`,
       `Route: ${routeSummary}`,
       `Epic Relic: ${hasEpic}`,
@@ -3782,7 +3996,7 @@ export class DungeonScene extends Phaser.Scene {
     ], { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 4, wordWrap: { width: 620 } }));
     panel.add(this.createMenuButton(-105, 198, 170, '重新开始', () => {
       this.settlementPanel?.destroy();
-      this.startGame();
+      this.showWeaponSelection();
     }));
     panel.add(this.createMenuButton(105, 198, 170, '返回标题', () => {
       this.settlementPanel?.destroy();

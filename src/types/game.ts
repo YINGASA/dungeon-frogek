@@ -200,6 +200,9 @@ export interface GameRun {
   combatEvents?: number;
   wasPoisoned?: boolean;
   wasCursed?: boolean;
+  weaponId?: string;
+  weaponName?: string;
+  weaponStyle?: string;
 }
 
 export interface AssetManifest {
