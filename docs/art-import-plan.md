@@ -109,6 +109,13 @@ V1.5.2：第一关地图 tileset / 房间氛围第一版
 - 保留 fallback。
 - 不改战斗逻辑。
 
+V1.5.2 当前实现说明：
+
+- 先使用 `src/game/assets/roomVisualThemes.ts` 和 Phaser Graphics 生成第一版房间氛围。
+- 当前不新增真实 tileset PNG，不下载资源，不安装依赖。
+- 这些生成式装饰只作为表现层，不参与碰撞，不改变门、传送门、波次、奖励、事件、Boss 或结算逻辑。
+- 后续正式 tileset 导入时，应保留当前 generated fallback，等正式素材确认风格和 license 后再逐步替换。
+
 V1.5.3：普通怪 sprite 第一版
 
 - 接入晶化史莱姆 / 骷髅守卫 / 蝙蝠 / 射手 sprite。

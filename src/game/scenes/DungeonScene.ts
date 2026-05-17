@@ -8,6 +8,7 @@ import {
   registerConfiguredArtAssets,
   registerFallbackAnimations
 } from '../assets/artManifest';
+import { getRoomVisualTheme, RoomVisualTheme, RoomVisualThemeKey } from '../assets/roomVisualThemes';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'start' | 'battle' | 'treasure' | 'event' | 'elite' | 'rest' | 'boss';
@@ -1942,10 +1943,20 @@ export class DungeonScene extends Phaser.Scene {
     return hadStatus;
   }
 
+  private getRoomVisualThemeKey(): RoomVisualThemeKey {
+    if (this.currentRoom.kind === 'elite') return this.currentRoom.name.includes('精英') ? 'elite' : 'advanced';
+    if (this.currentRoom.kind === 'treasure') return 'treasure';
+    if (this.currentRoom.kind === 'event') return 'event';
+    if (this.currentRoom.kind === 'boss') return 'boss';
+    if (this.currentRoom.kind === 'start') return 'start';
+    return 'battle';
+  }
+
   private drawRoom() {
     const bossRoom = this.currentRoom.kind === 'boss';
-    const roomColor = bossRoom ? 0x12091d : 0x101a2b;
-    const borderColor = bossRoom ? 0xff4f9b : 0x2b4665;
+    const theme = getRoomVisualTheme(this.getRoomVisualThemeKey());
+    const roomColor = theme.floorColor;
+    const borderColor = bossRoom ? theme.accentColor : theme.wallInnerColor;
     this.add.rectangle(480, 320, bossRoom ? 780 : 720, bossRoom ? 450 : 410, roomColor).setStrokeStyle(3, borderColor).setData('roomObj', true).setDepth(0);
     const cols = bossRoom ? 20 : 18;
     const rows = bossRoom ? 11 : 10;
@@ -1953,7 +1964,7 @@ export class DungeonScene extends Phaser.Scene {
     const startY = 320 - (rows * 32) / 2 + 16;
     for (let x = 0; x < cols; x += 1) {
       for (let y = 0; y < rows; y += 1) {
-        this.add.image(startX + x * 32, startY + y * 32, this.assetKey('floor')).setDisplaySize(32, 32).setData('roomObj', true).setDepth(1);
+        this.add.image(startX + x * 32, startY + y * 32, this.assetKey('floor')).setDisplaySize(32, 32).setTint(theme.floorColor).setData('roomObj', true).setDepth(1);
       }
     }
     const left = bossRoom ? 80 : 128;
@@ -1961,6 +1972,7 @@ export class DungeonScene extends Phaser.Scene {
     const top = bossRoom ? 80 : 128;
     const bottom = bossRoom ? 560 : 512;
     this.currentRoomBounds = new Phaser.Geom.Rectangle(left + 34, top + 34, right - left - 68, bottom - top - 68);
+    this.drawRoomFloorArt(theme, left, right, top, bottom, bossRoom);
     const wallKey = this.assetKey('wall');
     for (let x = left; x <= right; x += 32) {
       this.walls.add(this.physics.add.staticSprite(x, top, wallKey).setDisplaySize(34, 34).setDepth(4));
@@ -1970,13 +1982,138 @@ export class DungeonScene extends Phaser.Scene {
       this.walls.add(this.physics.add.staticSprite(left, y, wallKey).setDisplaySize(34, 34).setDepth(4));
       this.walls.add(this.physics.add.staticSprite(right, y, wallKey).setDisplaySize(34, 34).setDepth(4));
     }
-    this.addCrystalDecorations(bossRoom);
+    this.drawRoomBoundaryArt(theme, left, right, top, bottom, bossRoom);
+    this.addCrystalDecorations(bossRoom, theme);
     this.doorSprite = this.add.image(right, 320, this.assetKey('door_closed')).setDisplaySize(46, 98).setData('roomObj', true).setDepth(6);
     if (this.currentRoom.reward === 'chest') this.items.add(this.physics.add.staticSprite(480, 320, this.assetKey(this.currentRoom.rewardClaimed ? 'chest_open' : 'chest_closed')).setDisplaySize(52, 52).setDepth(20).setData('item', 'chest'));
     if (this.currentRoom.reward === 'potion') this.items.add(this.physics.add.staticSprite(480, 320, this.assetKey('potion_hp')).setDisplaySize(44, 44).setDepth(20).setData('item', 'potion'));
     if (this.currentRoom.kind === 'rest') this.createRestSupplyObject();
     if (bossRoom) this.createBossBar();
     else this.destroyBossBar();
+  }
+
+  private getRoomVisualSeed() {
+    const text = `${this.currentRoom.id}:${this.currentRoom.name}:${this.currentRoomIndex}`;
+    return text.split('').reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 17), 137);
+  }
+
+  private seededUnit(seed: number) {
+    const value = Math.sin(seed) * 10000;
+    return value - Math.floor(value);
+  }
+
+  private seededPoint(seed: number, index: number, left: number, right: number, top: number, bottom: number, margin = 58) {
+    const x = Phaser.Math.Linear(left + margin, right - margin, this.seededUnit(seed + index * 37));
+    const y = Phaser.Math.Linear(top + margin, bottom - margin, this.seededUnit(seed + index * 53));
+    return { x, y };
+  }
+
+  private drawRoomFloorArt(theme: RoomVisualTheme, left: number, right: number, top: number, bottom: number, bossRoom: boolean) {
+    const g = this.add.graphics().setData('roomObj', true).setDepth(2);
+    const seed = this.getRoomVisualSeed();
+    const innerLeft = left + 32;
+    const innerRight = right - 32;
+    const innerTop = top + 32;
+    const innerBottom = bottom - 32;
+
+    g.fillStyle(theme.floorColor, 0.24).fillRect(innerLeft, innerTop, innerRight - innerLeft, innerBottom - innerTop);
+    g.lineStyle(1, theme.floorLineColor, 0.28);
+    for (let x = innerLeft; x <= innerRight; x += 32) g.lineBetween(x, innerTop, x, innerBottom);
+    for (let y = innerTop; y <= innerBottom; y += 32) g.lineBetween(innerLeft, y, innerRight, y);
+
+    const crackCount = Math.round(5 + theme.propDensity * 11 + theme.dangerLevel * 6);
+    for (let i = 0; i < crackCount; i += 1) {
+      const point = this.seededPoint(seed, i, innerLeft, innerRight, innerTop, innerBottom, 40);
+      const length = 18 + this.seededUnit(seed + i * 19) * (bossRoom ? 36 : 24);
+      const angle = this.seededUnit(seed + i * 23) * Math.PI * 2;
+      g.lineStyle(1 + Math.round(theme.dangerLevel), theme.crackColor, 0.18 + theme.dangerLevel * 0.2);
+      g.lineBetween(point.x, point.y, point.x + Math.cos(angle) * length, point.y + Math.sin(angle) * length);
+      if (theme.dangerLevel > 0.4) g.lineBetween(point.x + 4, point.y, point.x + Math.cos(angle + 0.7) * length * 0.55, point.y + Math.sin(angle + 0.7) * length * 0.55);
+    }
+
+    const fragmentCount = Math.round(3 + theme.crystalDensity * 8);
+    for (let i = 0; i < fragmentCount; i += 1) {
+      const point = this.seededPoint(seed + 300, i, innerLeft, innerRight, innerTop, innerBottom, 58);
+      const size = 3 + Math.floor(this.seededUnit(seed + i * 29) * 4);
+      g.fillStyle(theme.glowColor, 0.18 + theme.crystalDensity * 0.12);
+      g.fillTriangle(point.x, point.y - size, point.x - size, point.y + size, point.x + size, point.y + size);
+      g.lineStyle(1, theme.accentColor, 0.28).strokeTriangle(point.x, point.y - size, point.x - size, point.y + size, point.x + size, point.y + size);
+    }
+
+    this.drawRoomThemeSignature(g, theme, innerLeft, innerRight, innerTop, innerBottom);
+  }
+
+  private drawRoomThemeSignature(g: Phaser.GameObjects.Graphics, theme: RoomVisualTheme, left: number, right: number, top: number, bottom: number) {
+    const cx = 480;
+    const cy = 320;
+    if (theme.decorationStyle === 'clean') {
+      g.lineStyle(1, theme.glowColor, 0.28).strokeCircle(cx, cy, 64);
+      g.fillStyle(theme.glowColor, 0.08).fillCircle(cx, cy, 44);
+      return;
+    }
+
+    if (theme.decorationStyle === 'treasure') {
+      g.fillStyle(theme.accentColor, 0.12).fillRoundedRect(cx - 70, cy - 44, 140, 88, 8);
+      g.lineStyle(2, theme.glowColor, 0.44).strokeRoundedRect(cx - 70, cy - 44, 140, 88, 8);
+      g.lineStyle(1, theme.runeColor, 0.32).strokeCircle(cx, cy, 78);
+      return;
+    }
+
+    if (theme.decorationStyle === 'event') {
+      g.lineStyle(2, theme.runeColor, 0.34).strokeTriangle(cx, cy - 74, cx - 72, cy + 42, cx + 72, cy + 42);
+      g.lineStyle(1, theme.glowColor, 0.22).strokeCircle(cx, cy, 52);
+      g.fillStyle(theme.runeColor, 0.07).fillCircle(cx, cy, 66);
+      return;
+    }
+
+    if (theme.decorationStyle === 'rune') {
+      g.lineStyle(2, theme.runeColor, 0.38).strokeCircle(cx, cy, 96);
+      g.lineStyle(1, theme.accentColor, 0.34).strokeCircle(cx, cy, 62);
+      for (let i = 0; i < 8; i += 1) {
+        const angle = (Math.PI * 2 * i) / 8;
+        g.lineBetween(cx + Math.cos(angle) * 78, cy + Math.sin(angle) * 78, cx + Math.cos(angle) * 96, cy + Math.sin(angle) * 96);
+      }
+      return;
+    }
+
+    if (theme.decorationStyle === 'boss') {
+      g.fillStyle(theme.accentColor, 0.08).fillCircle(cx + 44, cy, 132);
+      g.lineStyle(3, theme.runeColor, 0.38).strokeCircle(cx + 44, cy, 122);
+      g.lineStyle(2, theme.crackColor, 0.5);
+      g.lineBetween(left + 80, top + 78, right - 92, bottom - 76);
+      g.lineBetween(right - 190, top + 58, left + 210, bottom - 50);
+      return;
+    }
+
+    if (theme.decorationStyle === 'merchant') {
+      g.fillStyle(theme.accentColor, 0.1).fillRoundedRect(cx - 90, cy - 36, 180, 72, 10);
+      g.lineStyle(2, theme.glowColor, 0.32).strokeRoundedRect(cx - 90, cy - 36, 180, 72, 10);
+      return;
+    }
+
+    if (theme.decorationStyle === 'danger') {
+      g.fillStyle(theme.runeColor, 0.08).fillCircle(cx + 80, cy, 78);
+      g.lineStyle(1, theme.runeColor, 0.28).strokeCircle(cx + 80, cy, 82);
+    }
+  }
+
+  private drawRoomBoundaryArt(theme: RoomVisualTheme, left: number, right: number, top: number, bottom: number, bossRoom: boolean) {
+    const g = this.add.graphics().setData('roomObj', true).setDepth(5);
+    const thickness = bossRoom ? 5 : 3;
+    g.lineStyle(thickness, theme.wallColor, 0.78).strokeRect(left - 14, top - 14, right - left + 28, bottom - top + 28);
+    g.lineStyle(2, theme.wallInnerColor, bossRoom ? 0.72 : 0.52).strokeRect(left + 15, top + 15, right - left - 30, bottom - top - 30);
+    g.lineStyle(3, theme.accentColor, bossRoom ? 0.78 : 0.56).strokeRoundedRect(right - 28, 320 - 58, 52, 116, 8);
+    g.fillStyle(theme.glowColor, this.roomCleared ? 0.08 : 0.04).fillRoundedRect(right - 30, 320 - 60, 56, 120, 8);
+
+    const runeY = [top + 28, bottom - 28];
+    runeY.forEach((y, row) => {
+      for (let x = left + 80; x <= right - 112; x += 128) {
+        const alpha = 0.16 + theme.dangerLevel * 0.14;
+        g.lineStyle(1, theme.runeColor, alpha);
+        g.strokeCircle(x + (row ? 36 : 0), y, 7);
+        g.lineBetween(x - 12 + (row ? 36 : 0), y, x + 12 + (row ? 36 : 0), y);
+      }
+    });
   }
 
   private createRestSupplyObject() {
@@ -2044,10 +2181,21 @@ export class DungeonScene extends Phaser.Scene {
     this.branchDoorLabels = [];
   }
 
-  private addCrystalDecorations(bossRoom: boolean) {
-    const points = bossRoom ? [[210, 170], [750, 180], [235, 470], [710, 450], [480, 150]] : [[245, 190], [690, 210], [300, 455], [710, 430]];
+  private addCrystalDecorations(bossRoom: boolean, theme: RoomVisualTheme) {
+    const basePoints = bossRoom ? [[210, 170], [750, 180], [235, 470], [710, 450], [480, 150]] : [[245, 190], [690, 210], [300, 455], [710, 430]];
+    const extraPoints = theme.decorationStyle === 'treasure'
+      ? [[405, 288], [555, 352]]
+      : theme.decorationStyle === 'event'
+        ? [[390, 380], [575, 260]]
+        : theme.decorationStyle === 'rune'
+          ? [[480, 212], [480, 428]]
+          : theme.decorationStyle === 'boss'
+            ? [[360, 208], [625, 430], [805, 318]]
+            : [];
+    const points = [...basePoints, ...extraPoints];
     points.forEach(([x, y], index) => {
       const crystal = this.add.image(x, y, this.assetKey(index % 2 ? 'crystal_02' : 'crystal_01')).setDisplaySize(38, 44).setData('roomObj', true).setDepth(3);
+      crystal.setTint(index % 2 ? theme.glowColor : theme.accentColor);
       this.tweens.add({ targets: crystal, alpha: 0.42, yoyo: true, repeat: -1, duration: 900 + index * 110 });
     });
   }

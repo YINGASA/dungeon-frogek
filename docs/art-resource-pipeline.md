@@ -14,6 +14,25 @@ Future official assets should follow:
 
 Temporary or mismatched art should not replace the current game visuals unless it is explicitly accepted as a stable placeholder. The existing Graphics fallback remains the safe baseline.
 
+## V1.5.2 Room Visual Pass
+
+V1.5.2 improves the first-floor room atmosphere with generated Phaser Graphics and configured room themes. It does not add external PNG files, does not load unknown assets, and does not change gameplay logic.
+
+Current runtime behavior:
+
+- Room floors use lightweight tile-like generated linework and low-alpha overlays.
+- Room boundaries use generated wall, rune, and door-frame accents.
+- Treasure, event, elite, advanced battle, start, and boss rooms receive distinct non-collision decoration.
+- Decorations are created when a room is loaded and use the existing `roomObj` cleanup marker, so old room art is destroyed during room switches.
+- All generated room art stays below players, enemies, projectiles, interactables, UI, reward panels, event panels, and Boss warnings.
+
+Future tileset replacement should keep the same fallback contract:
+
+1. Register a formal first-floor tileset in `src/game/assets/artManifest.ts`.
+2. Prefer real tileset rendering only when the asset is present and enabled.
+3. Keep generated Graphics fallback available when assets are missing, disabled, or still being evaluated.
+4. Do not let tile art alter collision, pathing, door placement, room routing, reward timing, enemy spawning, or combat hitboxes.
+
 ## Directory Layout
 
 Place future first-floor runtime art under:
