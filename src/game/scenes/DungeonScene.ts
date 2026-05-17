@@ -251,25 +251,25 @@ const WEAPONS: WeaponConfig[] = [
   {
     id: 'heavy-blade',
     name: '重刃',
-    role: '爆发击退',
-    description: '打得更痛，攻击节奏更慢，适合抓时机爆发。',
-    pros: '伤害高，击退强，冲刺斩更重',
-    cons: '攻速慢，移动略慢，冲刺冷却略长',
-    attackDamageMultiplier: 1.3,
-    attackRange: 72,
-    attackWidth: 50,
-    attackCooldown: 415,
-    knockbackPower: 43,
-    dashDamageMultiplier: 1.25,
+    role: '高伤害慢攻',
+    description: '高伤害慢攻，强击退但出手窗口更危险。',
+    pros: '伤害高，击退强，冲刺斩更痛',
+    cons: '攻击慢，移动略慢，站桩风险更高',
+    attackDamageMultiplier: 1.35,
+    attackRange: 68,
+    attackWidth: 44,
+    attackCooldown: 425,
+    knockbackPower: 42,
+    dashDamageMultiplier: 1.22,
     dashDistanceMultiplier: 0.96,
     dashCooldownMultiplier: 1.1,
-    dashHitRadius: 50,
+    dashHitRadius: 48,
     moveSpeedMultiplier: 0.95,
     attackColor: 0xffd28a,
     attackAlpha: 0.3,
-    attackVisual: '宽大重斩',
-    dashVisual: '高伤害冲刺重斩',
-    specialText: '普攻：宽大重斩｜冲刺：高伤害冲刺重斩',
+    attackVisual: '高伤害重斩，冷却较慢',
+    dashVisual: '高伤害冲刺重斩，冷却略长',
+    specialText: '普攻：高伤害重斩，冷却较慢｜冲刺：高伤害，冷却略长',
     styleSummary: '高伤害慢攻 / 强击退'
   },
   {
@@ -279,45 +279,45 @@ const WEAPONS: WeaponConfig[] = [
     description: '攻击距离更远但判定更窄，适合拉扯。',
     pros: '攻击距离长，冲刺斩距离更远',
     cons: '近身被围时判定不如短剑舒服',
-    attackDamageMultiplier: 0.95,
-    attackRange: 84,
-    attackWidth: 26,
-    attackCooldown: 330,
-    knockbackPower: 32,
-    dashDamageMultiplier: 1,
-    dashDistanceMultiplier: 1.2,
+    attackDamageMultiplier: 0.92,
+    attackRange: 88,
+    attackWidth: 22,
+    attackCooldown: 335,
+    knockbackPower: 30,
+    dashDamageMultiplier: 0.95,
+    dashDistanceMultiplier: 1.18,
     dashCooldownMultiplier: 1,
-    dashHitRadius: 36,
+    dashHitRadius: 34,
     moveSpeedMultiplier: 1,
     attackColor: 0x8ffcff,
     attackAlpha: 0.24,
     attackVisual: '长距离窄刺击',
-    dashVisual: '更远距离穿刺',
-    specialText: '普攻：长距离窄刺击｜冲刺：更远距离穿刺',
+    dashVisual: '更远距离穿刺突进',
+    specialText: '普攻：长距离窄刺击｜冲刺：更远距离穿刺突进',
     styleSummary: '长距离穿刺 / 拉扯输出'
   },
   {
     id: 'dual-daggers',
     name: '双匕',
-    role: '高频贴身',
-    description: '攻击频率高但范围短，需要更主动地贴近敌人。',
-    pros: '攻速快，冲刺斩冷却短，移动更灵活',
-    cons: '单次伤害低，攻击短，击退较弱',
-    attackDamageMultiplier: 0.55,
-    attackRange: 50,
-    attackWidth: 30,
-    attackCooldown: 230,
-    knockbackPower: 24,
-    dashDamageMultiplier: 0.9,
+    role: '快速双段',
+    description: '两段短斩，范围短且击退弱，需要贴身输出。',
+    pros: '两段全中伤害高，冷却短，移动更灵活',
+    cons: '范围短，击退弱，贴脸风险高',
+    attackDamageMultiplier: 0.58,
+    attackRange: 48,
+    attackWidth: 28,
+    attackCooldown: 220,
+    knockbackPower: 23,
+    dashDamageMultiplier: 0.88,
     dashDistanceMultiplier: 1,
-    dashCooldownMultiplier: 0.8,
+    dashCooldownMultiplier: 0.82,
     dashHitRadius: 40,
-    moveSpeedMultiplier: 1.08,
+    moveSpeedMultiplier: 1.06,
     attackColor: 0xd9b8ff,
     attackAlpha: 0.28,
-    attackVisual: '双段短斩',
-    dashVisual: '短冷却快速突进',
-    specialText: '普攻：双段短斩｜冲刺：短冷却快速突进',
+    attackVisual: '两段短斩，范围短，冷却快',
+    dashVisual: '冷却较短，伤害略低',
+    specialText: '普攻：两段短斩，范围短，冷却快｜冲刺：冷却较短，伤害略低',
     styleSummary: '快速双段 / 高风险贴身输出'
   }
 ];
@@ -1197,9 +1197,10 @@ export class DungeonScene extends Phaser.Scene {
       `遗物：${this.relicState.relics.length}`,
       `当前角色：${this.selectedHero.name}`,
       `角色说明：${this.selectedHero.description}`,
-      `当前武器：${this.selectedWeapon.name}｜${this.selectedWeapon.styleSummary}`,
+      `当前武器：${this.selectedWeapon.name}`,
+      `武器特点：${this.selectedWeapon.styleSummary}`,
       `普攻：${this.selectedWeapon.attackVisual}`,
-      `冲刺：${this.selectedWeapon.dashVisual}`,
+      `K 冲刺：${this.selectedWeapon.dashVisual}`,
       `当前房间：第 ${this.getDisplayRoomNumber()} / ${this.getDisplayTotalRooms()} 房`,
       `房间类型：${this.getRoomTypeLabel()}`
     ].join('\n');
@@ -2334,7 +2335,7 @@ export class DungeonScene extends Phaser.Scene {
         if (!this.player.active || this.playerActionState === 'dead') return;
         this.sfx.play('swing');
         this.showWeaponAttackEffect(weapon, 2);
-        this.hitInArc(rawDamage, weapon.attackRange * 0.94, '双匕第二段', 42, Math.round(weapon.knockbackPower * 0.72), 120, weapon.attackWidth);
+        this.hitInArc(rawDamage, weapon.attackRange * 0.96, '双匕第二段', 38, Math.round(weapon.knockbackPower * 0.65), 110, weapon.attackWidth);
       });
     } else {
       this.showWeaponAttackEffect(weapon);
@@ -2406,8 +2407,8 @@ export class DungeonScene extends Phaser.Scene {
     if (weapon.id === 'spear') {
       const start = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(18));
       const end = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(weapon.attackRange));
-      const line = this.add.line(0, 0, start.x, start.y, end.x, end.y, weapon.attackColor, 0.5).setOrigin(0).setLineWidth(5).setDepth(28);
-      const tip = this.add.circle(end.x, end.y, 7, 0xeaffff, 0.82).setDepth(28);
+      const line = this.add.line(0, 0, start.x, start.y, end.x, end.y, weapon.attackColor, 0.5).setOrigin(0).setLineWidth(4).setDepth(28);
+      const tip = this.add.circle(end.x, end.y, 6, 0xeaffff, 0.82).setDepth(28);
       this.tweens.add({ targets: [line, tip], alpha: 0, duration: 165, onComplete: () => { line.destroy(); tip.destroy(); } });
       return;
     }
@@ -3619,8 +3620,12 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getWeaponStatText(weapon: WeaponConfig) {
+    const damageText = weapon.id === 'dual-daggers'
+      ? `每段 ${Math.round(weapon.attackDamageMultiplier * 100)}% x2`
+      : `${Math.round(weapon.attackDamageMultiplier * 100)}%`;
     return [
-      `伤害 ${Math.round(weapon.attackDamageMultiplier * 100)}%  范围 ${weapon.attackRange}`,
+      `伤害 ${damageText}`,
+      `范围 ${weapon.attackRange}  宽度 ${weapon.attackWidth}`,
       `冷却 ${weapon.attackCooldown}ms  击退 ${weapon.knockbackPower}`,
       `K伤害 ${Math.round(weapon.dashDamageMultiplier * 100)}%  K距离 ${Math.round(weapon.dashDistanceMultiplier * 100)}%`,
       `K冷却 ${Math.round(weapon.dashCooldownMultiplier * 100)}%  移速 ${Math.round(weapon.moveSpeedMultiplier * 100)}%`
@@ -4167,7 +4172,8 @@ export class DungeonScene extends Phaser.Scene {
       `Negative Events: ${this.eventStats.negative}  Combat Events: ${this.eventStats.combat}`,
       `Statuses: ${this.eventStats.poisoned ? 'Poisoned' : 'No poison'} / ${this.eventStats.cursed ? 'Cursed' : 'No curse'}`,
       `Hero: ${this.selectedHero.name}`,
-      `Weapon: ${this.selectedWeapon.name}  Style: ${this.selectedWeapon.styleSummary}`,
+      `使用武器：${this.selectedWeapon.name}`,
+      `流派：${this.selectedWeapon.styleSummary}`,
       `Reward Choices: ${this.rewardChoiceCount}  Relics: ${this.relicState.relics.length}`,
       `Route: ${routeSummary}`,
       `Epic Relic: ${hasEpic}`,
