@@ -2,6 +2,18 @@
 
 This document defines the first-floor art resource structure for Lingxu Dungeon. V1.5 does not add a second floor, new theme, new boss, or runtime dependency. It prepares naming, manifest, and fallback rules so future FrameRonin exports can be added safely.
 
+## V1.5.1 Direction
+
+V1.5.1 does not directly integrate temporary hero or weapon sprite sheets. The current priority is to define the first-floor art style, asset source policy, sizing rules, and import order before replacing runtime visuals.
+
+Future official assets should follow:
+
+- `docs/art-style-guide.md`
+- `docs/art-import-plan.md`
+- The directory and naming rules in this document
+
+Temporary or mismatched art should not replace the current game visuals unless it is explicitly accepted as a stable placeholder. The existing Graphics fallback remains the safe baseline.
+
 ## Directory Layout
 
 Place future first-floor runtime art under:
@@ -101,6 +113,8 @@ The runtime contract is:
 1. If a registered sprite sheet exists and is enabled in the manifest, Phaser can load it and create animations.
 2. If a sprite sheet does not exist or remains marked as fallback, the game keeps using current generated SVG/PNG assets and Graphics fallback textures.
 3. Gameplay hitboxes, weapon damage, J/K/L timing, enemy AI, and room routing stay controlled by game logic, not animation frames.
+4. Animation is visual only. Sprite frames must not drive damage, knockback, cooldown, dash distance, collision, reward timing, or room completion.
+5. If a resource is missing, disabled, or fails to load, fallback is expected behavior rather than an error state.
 
 V1.5 intentionally does not replace the current character, enemy, map, or effect rendering. It only provides the manifest and safe hooks for later replacement.
 
@@ -160,7 +174,7 @@ FrameRonin can be used later as an external art preparation tool:
 2. Use FrameRonin to split frames, crop, cut out backgrounds, and compose sprite sheets.
 3. Export PNG and optional JSON metadata.
 4. Place exported files under the matching `public/assets/game` directory.
-5. Register the asset and animation in `artResourceManifest.ts`.
+5. Register the asset and animation in `src/game/assets/artManifest.ts`.
 6. Let Phaser load registered resources; missing or disabled resources continue using fallback.
 7. Keep combat judgment in game logic. Animation timing must not silently change attack hitboxes or damage.
 
