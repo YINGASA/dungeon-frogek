@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { GameRun, LevelConfig, PlayerClassConfig } from '../../types/game';
 import { storageService } from '../../services/storageService';
+import {
+  getHeroAnimationKey as getManifestHeroAnimationKey,
+  getWeaponAttackEffectKey as getManifestWeaponAttackEffectKey,
+  hasArtAsset as manifestHasArtAsset,
+  registerConfiguredArtAssets,
+  registerFallbackAnimations
+} from '../assets/artManifest';
 
 type EnemyKind = 'slime' | 'skeleton' | 'bat' | 'archer' | 'boss';
 type RoomKind = 'start' | 'battle' | 'treasure' | 'event' | 'elite' | 'rest' | 'boss';
@@ -954,11 +961,13 @@ export class DungeonScene extends Phaser.Scene {
     this.load.image('guardian-crystal-projectile-svg', '/assets/generated/boss/crystal_guardian/crystal_projectile.svg');
     this.load.image('guardian-crystal-spike-png', '/assets/generated/boss/crystal_guardian/crystal_spike.png');
     this.load.image('guardian-crystal-spike-svg', '/assets/generated/boss/crystal_guardian/crystal_spike.svg');
+    registerConfiguredArtAssets(this);
   }
 
   create() {
     this.resetRunState();
     this.createTextures();
+    registerFallbackAnimations(this);
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,J,K,L,E,I,ESC,R,ONE,TWO,THREE,FOUR') as Record<string, Phaser.Input.Keyboard.Key>;
     this.enemies = this.physics.add.group();
@@ -1363,6 +1372,20 @@ export class DungeonScene extends Phaser.Scene {
     if (this.textures.exists(png)) return png;
     if (this.textures.exists(svg)) return svg;
     return fallback;
+  }
+
+  private hasArtAsset(key: string) {
+    return manifestHasArtAsset(this, key);
+  }
+
+  private getHeroAnimationKey(heroId: HeroId, weaponId: WeaponId, action: 'idle' | 'walk' | 'hurt' | 'death') {
+    const key = getManifestHeroAnimationKey(heroId, weaponId, action);
+    return key && this.anims.exists(key) ? key : undefined;
+  }
+
+  private getWeaponAttackEffectKey(weaponId: WeaponId) {
+    const key = getManifestWeaponAttackEffectKey(weaponId);
+    return key && this.anims.exists(key) ? key : undefined;
   }
 
   private hunterAssetKey(direction: HunterDirection, frame: HunterFrame = 'idle'): string {
