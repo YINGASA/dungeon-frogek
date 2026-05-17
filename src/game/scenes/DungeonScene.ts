@@ -12,6 +12,22 @@ type RewardTrigger = 'battle' | 'treasure' | 'elite';
 type EnemySpawnDef = EnemyKind | { kind: EnemyKind; elite?: boolean };
 type CombatWave = EnemySpawnDef[];
 type WeaponId = 'short-sword' | 'heavy-blade' | 'spear' | 'dual-daggers';
+type HeroId = 'relic-hunter';
+
+interface HeroConfig {
+  id: HeroId;
+  name: string;
+  description: string;
+  defaultWeaponId: WeaponId;
+  allowedWeaponIds: WeaponId[];
+  baseStats: {
+    hp: number;
+    atk: number;
+    def: number;
+    speed: number;
+  };
+  passiveText: string;
+}
 
 interface WeaponConfig {
   id: WeaponId;
@@ -32,6 +48,8 @@ interface WeaponConfig {
   moveSpeedMultiplier: number;
   attackColor: number;
   attackAlpha: number;
+  attackVisual: string;
+  dashVisual: string;
   specialText: string;
   styleSummary: string;
 }
@@ -225,7 +243,9 @@ const WEAPONS: WeaponConfig[] = [
     moveSpeedMultiplier: 1,
     attackColor: 0xffffff,
     attackAlpha: 0.26,
-    specialText: '普通攻击：标准｜冲刺斩：标准',
+    attackVisual: '标准弧形斩击',
+    dashVisual: '标准冲刺斩',
+    specialText: '普攻：标准弧形斩击｜冲刺：标准冲刺斩',
     styleSummary: '均衡稳定 / 标准作战'
   },
   {
@@ -247,8 +267,10 @@ const WEAPONS: WeaponConfig[] = [
     moveSpeedMultiplier: 0.95,
     attackColor: 0xffd28a,
     attackAlpha: 0.3,
-    specialText: '普通攻击：高伤 / 慢速｜冲刺斩：重击',
-    styleSummary: '高伤爆发 / 强击退'
+    attackVisual: '宽大重斩',
+    dashVisual: '高伤害冲刺重斩',
+    specialText: '普攻：宽大重斩｜冲刺：高伤害冲刺重斩',
+    styleSummary: '高伤害慢攻 / 强击退'
   },
   {
     id: 'spear',
@@ -269,8 +291,10 @@ const WEAPONS: WeaponConfig[] = [
     moveSpeedMultiplier: 1,
     attackColor: 0x8ffcff,
     attackAlpha: 0.24,
-    specialText: '普通攻击：长距离 / 窄判定｜冲刺斩：更远',
-    styleSummary: '远距离穿刺 / 拉扯输出'
+    attackVisual: '长距离窄刺击',
+    dashVisual: '更远距离穿刺',
+    specialText: '普攻：长距离窄刺击｜冲刺：更远距离穿刺',
+    styleSummary: '长距离穿刺 / 拉扯输出'
   },
   {
     id: 'dual-daggers',
@@ -279,7 +303,7 @@ const WEAPONS: WeaponConfig[] = [
     description: '攻击频率高但范围短，需要更主动地贴近敌人。',
     pros: '攻速快，冲刺斩冷却短，移动更灵活',
     cons: '单次伤害低，攻击短，击退较弱',
-    attackDamageMultiplier: 0.75,
+    attackDamageMultiplier: 0.55,
     attackRange: 50,
     attackWidth: 30,
     attackCooldown: 230,
@@ -291,12 +315,36 @@ const WEAPONS: WeaponConfig[] = [
     moveSpeedMultiplier: 1.08,
     attackColor: 0xd9b8ff,
     attackAlpha: 0.28,
-    specialText: '普通攻击：快速 / 短距｜冲刺斩：高频',
-    styleSummary: '快速连击 / 贴身输出'
+    attackVisual: '双段短斩',
+    dashVisual: '短冷却快速突进',
+    specialText: '普攻：双段短斩｜冲刺：短冷却快速突进',
+    styleSummary: '快速双段 / 高风险贴身输出'
   }
 ];
 
 const DEFAULT_WEAPON = WEAPONS[0];
+const WEAPON_BY_ID = new Map<WeaponId, WeaponConfig>(WEAPONS.map((weapon) => [weapon.id, weapon]));
+
+const HEROES: HeroConfig[] = [
+  {
+    id: 'relic-hunter',
+    name: '遗迹猎人',
+    description: '进入灵墟寻找源晶的探索者',
+    defaultWeaponId: 'short-sword',
+    allowedWeaponIds: ['short-sword', 'heavy-blade', 'spear', 'dual-daggers'],
+    baseStats: {
+      hp: 120,
+      atk: 14,
+      def: 4,
+      speed: 175
+    },
+    passiveText: '无专属被动'
+  }
+];
+
+const DEFAULT_HERO = HEROES[0];
+
+const getWeaponById = (id?: WeaponId) => (id ? WEAPON_BY_ID.get(id) : undefined) ?? DEFAULT_WEAPON;
 
 const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = {
   slime: { name: '晶化史莱姆', kind: 'slime', hp: 25, maxHp: 25, atk: 7, def: 0, speed: 55, range: 30, cooldown: 1100 },
@@ -328,13 +376,32 @@ const REWARD_POOL: RewardOption[] = [
   { id: 'echo-core', name: '回响核心', rarity: 'epic', type: '技能', description: '每次冲刺斩首次命中敌人时返还少量冷却。', effectText: 'K 命中后返还 1 秒冷却', apply: () => undefined }
 ];
 
+const WEAPON_AWARE_RELIC_TEXT: Partial<Record<WeaponId, Record<string, { name: string; description: string }>>> = {
+  'short-sword': {
+    'sharp-blade': { name: '锋利剑刃', description: '剑刃重新开锋，短剑斩击更加凌厉。' },
+    'source-dagger': { name: '源晶短刃', description: '源晶强化短剑核心，冲刺斩更加锋利。' }
+  },
+  'heavy-blade': {
+    'sharp-blade': { name: '重刃淬火', description: '重刃被重新淬火，劈砍威力提升。' },
+    'source-dagger': { name: '源晶重锋', description: '源晶附着在重刃上，冲刺重斩威力提升。' }
+  },
+  spear: {
+    'sharp-blade': { name: '锋锐枪尖', description: '枪尖被源晶打磨，刺击更加精准。' },
+    'source-dagger': { name: '源晶枪芒', description: '枪尖凝聚源晶锋芒，冲刺穿刺更具威胁。' }
+  },
+  'dual-daggers': {
+    'sharp-blade': { name: '双刃开锋', description: '双匕刃口泛起寒光，连击更加致命。' },
+    'source-dagger': { name: '源晶双刃', description: '双匕吸附源晶能量，冲刺连斩更加迅捷。' }
+  }
+};
+
 const DUNGEON_EVENTS: DungeonEventDef[] = [
   {
     title: '古老祭坛',
     description: '一座布满裂纹的祭坛仍在低声共鸣，源晶碎片漂浮在祭坛上方。',
     options: [
       { text: '献祭 15 HP，获得 ATK +3', disabledText: '生命不足', canChoose: (scene) => scene.player.stats.hp > 15, apply: (scene) => { scene.player.stats.hp -= 15; scene.player.stats.atk += 3; return '献祭生命，ATK +3。'; } },
-      { text: '献祭 20 金币，获得随机 rare 奖励', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 20, apply: (scene) => { scene.gold -= 20; const reward = scene.pickRewardByRarity('rare', []); if (reward) scene.grantReward(reward); return reward ? `献祭金币，获得 ${reward.name}。` : '祭坛沉默了。'; } },
+      { text: '献祭 20 金币，获得随机 rare 奖励', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 20, apply: (scene) => { scene.gold -= 20; const reward = scene.pickRewardByRarity('rare', []); if (reward) scene.grantReward(reward); return reward ? `献祭金币，获得 ${scene.getRewardDisplayName(reward)}。` : '祭坛沉默了。'; } },
       { text: '离开，无事发生', canChoose: () => true, apply: () => '你离开了古老祭坛。' }
     ]
   },
@@ -351,7 +418,7 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     title: '污染源晶',
     description: '一枚污染源晶嵌在地面，里面传来微弱心跳声。',
     options: [
-      { text: '吸收源晶，获得随机奖励，但受到 12 点伤害', canChoose: (scene) => scene.player.stats.hp > 12, disabledText: '生命不足', apply: (scene) => { const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 75 ? 'rare' : 'common', []); scene.player.stats.hp = Math.max(1, scene.player.stats.hp - 12); if (reward) scene.grantReward(reward); return reward ? `吸收源晶，获得 ${reward.name}，受到 12 点伤害。` : '源晶碎裂，你受到 12 点伤害。'; } },
+      { text: '吸收源晶，获得随机奖励，但受到 12 点伤害', canChoose: (scene) => scene.player.stats.hp > 12, disabledText: '生命不足', apply: (scene) => { const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 75 ? 'rare' : 'common', []); scene.player.stats.hp = Math.max(1, scene.player.stats.hp - 12); if (reward) scene.grantReward(reward); return reward ? `吸收源晶，获得 ${scene.getRewardDisplayName(reward)}，受到 12 点伤害。` : '源晶碎裂，你受到 12 点伤害。'; } },
       { text: '净化源晶，回复 20 HP', canChoose: () => true, apply: (scene) => { const healed = scene.healPlayer(20); return `净化源晶，回复 ${healed} HP。`; } },
       { text: '打碎源晶，获得 20 金币', canChoose: () => true, apply: (scene) => { scene.gold += 20; return '打碎源晶，获得 20 金币。'; } }
     ]
@@ -632,8 +699,8 @@ const EVENT_PACK: EventPackDef[] = [
       const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 70 ? 'common' : 'rare', []);
       if (reward) scene.grantReward(reward);
       return {
-        log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${reward.name}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
-        floatingText: reward ? `-${8} HP / ${reward.name}` : '-8 HP',
+        log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${scene.getRewardDisplayName(reward)}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
+        floatingText: reward ? `-${8} HP / ${scene.getRewardDisplayName(reward)}` : '-8 HP',
         opensPortal: true
       };
     }
@@ -783,6 +850,7 @@ export class DungeonScene extends Phaser.Scene {
   private branchDoorLabels: Phaser.GameObjects.GameObject[] = [];
   private branchDoorTweens: Phaser.Tweens.Tween[] = [];
   private shieldRing?: Phaser.GameObjects.Arc;
+  private playerWeaponVisual?: Phaser.GameObjects.Graphics;
   private bossBarBg?: Phaser.GameObjects.Rectangle;
   private bossBarFill?: Phaser.GameObjects.Rectangle;
   private bossBarText?: Phaser.GameObjects.Text;
@@ -803,6 +871,7 @@ export class DungeonScene extends Phaser.Scene {
   private visitedRoomIds: string[] = [];
   private enteredRoomNumbers = new Map<string, number>();
   private currentRoom = this.createRouteRoom(ROOM_TEMPLATES.start[0], 0);
+  private selectedHero: HeroConfig = DEFAULT_HERO;
   private selectedWeapon: WeaponConfig = DEFAULT_WEAPON;
   private roomCleared = false;
   private rewardTaken = false;
@@ -996,13 +1065,13 @@ export class DungeonScene extends Phaser.Scene {
     this.setGameplayUiVisible(true);
     this.player.stats = {
       id: 'player',
-      name: '遗迹猎人',
+      name: this.selectedHero.name,
       kind: 'player',
-      hp: 120,
-      maxHp: 120,
-      atk: 14,
-      def: 4,
-      speed: 175,
+      hp: this.selectedHero.baseStats.hp,
+      maxHp: this.selectedHero.baseStats.hp,
+      atk: this.selectedHero.baseStats.atk,
+      def: this.selectedHero.baseStats.def,
+      speed: this.selectedHero.baseStats.speed,
       range: 54,
       cooldown: 330,
       nextAttack: 0
@@ -1064,14 +1133,14 @@ export class DungeonScene extends Phaser.Scene {
     this.statusPanel.add(this.add.text(-340, -165, '基础属性', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
     this.statusPanel.add(this.add.text(-340, -137, this.getStatusBasicLines(), {
       fontFamily: 'monospace',
-      fontSize: '13px',
+      fontSize: '12px',
       color: '#dff7ff',
-      lineSpacing: 3,
+      lineSpacing: 2,
       wordWrap: { width: 330 }
     }));
 
-    this.statusPanel.add(this.add.text(-340, 0, '当前增益', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
-    this.statusPanel.add(this.add.text(-340, 28, this.getStatusBuffLines(), {
+    this.statusPanel.add(this.add.text(-340, 22, '当前增益', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
+    this.statusPanel.add(this.add.text(-340, 50, this.getStatusBuffLines(), {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: '#eaffff',
@@ -1079,8 +1148,8 @@ export class DungeonScene extends Phaser.Scene {
       wordWrap: { width: 330 }
     }));
 
-    this.statusPanel.add(this.add.text(-340, 128, '当前减益', { fontFamily: 'monospace', fontSize: '17px', color: '#ffb0b0' }));
-    this.statusPanel.add(this.add.text(-340, 156, this.getStatusDebuffLines(), {
+    this.statusPanel.add(this.add.text(-340, 144, '当前减益', { fontFamily: 'monospace', fontSize: '17px', color: '#ffb0b0' }));
+    this.statusPanel.add(this.add.text(-340, 172, this.getStatusDebuffLines(), {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: '#ffe0e0',
@@ -1091,9 +1160,9 @@ export class DungeonScene extends Phaser.Scene {
     this.statusPanel.add(this.add.text(40, -165, '已获得遗物', { fontFamily: 'monospace', fontSize: '17px', color: '#8ffcff' }));
     this.statusPanel.add(this.add.text(40, -137, this.getStatusRelicLines(), {
       fontFamily: 'monospace',
-      fontSize: '13px',
+      fontSize: '12px',
       color: '#dff7ff',
-      lineSpacing: 4,
+      lineSpacing: 2,
       wordWrap: { width: 330 }
     }));
 
@@ -1126,8 +1195,11 @@ export class DungeonScene extends Phaser.Scene {
       `DEF：${this.player.stats.def}`,
       `金币：${this.gold}`,
       `遗物：${this.relicState.relics.length}`,
-      `当前武器：${this.selectedWeapon.name}｜${this.selectedWeapon.role}`,
-      `${this.selectedWeapon.specialText}`,
+      `当前角色：${this.selectedHero.name}`,
+      `角色说明：${this.selectedHero.description}`,
+      `当前武器：${this.selectedWeapon.name}｜${this.selectedWeapon.styleSummary}`,
+      `普攻：${this.selectedWeapon.attackVisual}`,
+      `冲刺：${this.selectedWeapon.dashVisual}`,
       `当前房间：第 ${this.getDisplayRoomNumber()} / ${this.getDisplayTotalRooms()} 房`,
       `房间类型：${this.getRoomTypeLabel()}`
     ].join('\n');
@@ -1143,9 +1215,9 @@ export class DungeonScene extends Phaser.Scene {
     if (this.relicState.potionHealBonus > 0) buffs.push(`药水回复 +${this.relicState.potionHealBonus}`);
     if (this.relicState.bonusDamage > 0) buffs.push(`普通攻击额外伤害 +${this.relicState.bonusDamage}`);
     if (this.relicState.damageReductionFromMinions > 0) buffs.push(`小怪伤害减免 ${Math.round(this.relicState.damageReductionFromMinions * 100)}%`);
-    if (this.player.stats.maxHp > 120) buffs.push(`最大生命提升 +${this.player.stats.maxHp - 120}`);
-    if (this.player.stats.atk > 14) buffs.push(`攻击提升 +${this.player.stats.atk - 14}`);
-    if (this.player.stats.def + this.rustDefensePenalty > 4) buffs.push(`防御提升 +${this.player.stats.def + this.rustDefensePenalty - 4}`);
+    if (this.player.stats.maxHp > this.selectedHero.baseStats.hp) buffs.push(`最大生命提升 +${this.player.stats.maxHp - this.selectedHero.baseStats.hp}`);
+    if (this.player.stats.atk > this.selectedHero.baseStats.atk) buffs.push(`攻击提升 +${this.player.stats.atk - this.selectedHero.baseStats.atk}`);
+    if (this.player.stats.def + this.rustDefensePenalty > this.selectedHero.baseStats.def) buffs.push(`防御提升 +${this.player.stats.def + this.rustDefensePenalty - this.selectedHero.baseStats.def}`);
     return buffs.length > 0 ? buffs.join('\n') : '暂无增益';
   }
 
@@ -1160,8 +1232,20 @@ export class DungeonScene extends Phaser.Scene {
   private getStatusRelicLines() {
     if (this.relicState.relics.length === 0) return '暂无遗物';
     return this.relicState.relics
-      .map((relic) => `${relic.name}｜${relic.rarity.toUpperCase()}｜${relic.effectText}`)
+      .map((relic) => `${this.getRewardDisplayName(relic)}｜${relic.rarity.toUpperCase()}｜${relic.effectText}\n${this.getRewardDisplayDescription(relic)}`)
       .join('\n');
+  }
+
+  private getRewardDisplayText(reward: RewardOption) {
+    return WEAPON_AWARE_RELIC_TEXT[this.selectedWeapon.id]?.[reward.id];
+  }
+
+  public getRewardDisplayName(reward: RewardOption) {
+    return this.getRewardDisplayText(reward)?.name ?? reward.name;
+  }
+
+  private getRewardDisplayDescription(reward: RewardOption) {
+    return this.getRewardDisplayText(reward)?.description ?? reward.description;
   }
 
   private getRecentObtainedText() {
@@ -1189,6 +1273,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private setWorldVisible(visible: boolean) {
     this.player?.setVisible(visible);
+    this.playerWeaponVisual?.setVisible(visible);
     this.enemies?.setVisible(visible);
     this.bullets?.setVisible(visible);
     this.walls?.setVisible(visible);
@@ -1263,6 +1348,7 @@ export class DungeonScene extends Phaser.Scene {
     this.updateBossHazards(time);
     if (!this.roomCleared && this.currentRoom.enemies.length > 0 && this.countLivingEnemies() === 0) this.handleRoomEnemiesCleared();
     this.updateInvincibleVisual(time);
+    this.updatePlayerWeaponVisual();
     this.updateUi(time);
     this.updateUnitHuds();
     this.handleEnemyProjectileHits();
@@ -1691,6 +1777,7 @@ export class DungeonScene extends Phaser.Scene {
       cooldown: 330,
       nextAttack: 0
     };
+    this.playerWeaponVisual = this.add.graphics().setDepth(31);
     this.createUnitHud(this.player);
   }
 
@@ -2182,6 +2269,56 @@ export class DungeonScene extends Phaser.Scene {
     this.player.setRotation(this.hasGeneratedHunter(nextDirection, frame) ? 0 : Phaser.Math.Angle.Between(0, 0, direction.x, direction.y) + Math.PI / 2);
   }
 
+  private updatePlayerWeaponVisual() {
+    if (!this.playerWeaponVisual || !this.player?.active || !this.player.visible || this.flowState !== 'playing') {
+      this.playerWeaponVisual?.clear();
+      return;
+    }
+    const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
+    const forward = this.lastFacing.lengthSq() > 0 ? this.lastFacing.clone().normalize() : new Phaser.Math.Vector2(1, 0);
+    const side = new Phaser.Math.Vector2(-forward.y, forward.x);
+    const origin = new Phaser.Math.Vector2(this.player.x, this.player.y).add(forward.clone().scale(10));
+    const hand = origin.clone().add(side.clone().scale(8));
+    const g = this.playerWeaponVisual.clear();
+    g.lineStyle(3, 0x06101a, 0.9);
+
+    if (weapon.id === 'heavy-blade') {
+      const tip = hand.clone().add(forward.clone().scale(34));
+      const left = hand.clone().add(forward.clone().scale(8)).add(side.clone().scale(8));
+      const right = hand.clone().add(forward.clone().scale(8)).add(side.clone().scale(-8));
+      g.fillStyle(0x9a6a38, 1).fillCircle(hand.x - forward.x * 5, hand.y - forward.y * 5, 4);
+      g.fillStyle(0xffd28a, 0.96).fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+      g.lineStyle(2, 0xfff1c8, 0.88).strokeTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+      return;
+    }
+
+    if (weapon.id === 'spear') {
+      const butt = origin.clone().add(forward.clone().scale(-17));
+      const shaftEnd = origin.clone().add(forward.clone().scale(38));
+      const tip = origin.clone().add(forward.clone().scale(48));
+      g.lineStyle(4, 0x8b6944, 0.95).lineBetween(butt.x, butt.y, shaftEnd.x, shaftEnd.y);
+      g.fillStyle(0x8ffcff, 0.96).fillTriangle(tip.x, tip.y, shaftEnd.x + side.x * 5, shaftEnd.y + side.y * 5, shaftEnd.x - side.x * 5, shaftEnd.y - side.y * 5);
+      g.lineStyle(1, 0xeaffff, 0.88).strokeTriangle(tip.x, tip.y, shaftEnd.x + side.x * 5, shaftEnd.y + side.y * 5, shaftEnd.x - side.x * 5, shaftEnd.y - side.y * 5);
+      return;
+    }
+
+    if (weapon.id === 'dual-daggers') {
+      [-1, 1].forEach((multiplier) => {
+        const base = origin.clone().add(side.clone().scale(12 * multiplier));
+        const tip = base.clone().add(forward.clone().scale(24)).add(side.clone().scale(3 * multiplier));
+        g.lineStyle(3, 0x45395d, 0.95).lineBetween(base.x, base.y, tip.x, tip.y);
+        g.lineStyle(2, 0xf0d8ff, 0.96).lineBetween(base.x + side.x * 2 * multiplier, base.y + side.y * 2 * multiplier, tip.x, tip.y);
+      });
+      return;
+    }
+
+    const tip = hand.clone().add(forward.clone().scale(28));
+    const guardA = hand.clone().add(side.clone().scale(8));
+    const guardB = hand.clone().add(side.clone().scale(-8));
+    g.lineStyle(4, 0xf5ffff, 0.95).lineBetween(hand.x, hand.y, tip.x, tip.y);
+    g.lineStyle(3, 0x35e7c4, 0.8).lineBetween(guardA.x, guardA.y, guardB.x, guardB.y);
+  }
+
   private normalAttack(time: number) {
     if (this.playerActionState === 'dashing' || this.playerActionState === 'dead') return;
     if (time < this.skillCooldowns.attack) return;
@@ -2189,9 +2326,20 @@ export class DungeonScene extends Phaser.Scene {
     this.playerActionState = 'attacking';
     this.skillCooldowns.attack = time + weapon.attackCooldown;
     this.sfx.play('swing');
-    this.showWeaponAttackEffect(weapon);
     const rawDamage = Math.round((this.player.stats.atk + this.relicState.bonusDamage) * weapon.attackDamageMultiplier);
-    this.hitInArc(rawDamage, weapon.attackRange, '普通攻击', 60, weapon.knockbackPower, 220, weapon.attackWidth);
+    if (weapon.id === 'dual-daggers') {
+      this.showWeaponAttackEffect(weapon, 1);
+      this.hitInArc(rawDamage, weapon.attackRange, '双匕第一段', 42, weapon.knockbackPower, 150, weapon.attackWidth);
+      this.time.delayedCall(80, () => {
+        if (!this.player.active || this.playerActionState === 'dead') return;
+        this.sfx.play('swing');
+        this.showWeaponAttackEffect(weapon, 2);
+        this.hitInArc(rawDamage, weapon.attackRange * 0.94, '双匕第二段', 42, Math.round(weapon.knockbackPower * 0.72), 120, weapon.attackWidth);
+      });
+    } else {
+      this.showWeaponAttackEffect(weapon);
+      this.hitInArc(rawDamage, weapon.attackRange, '普通攻击', weapon.id === 'heavy-blade' ? 72 : 60, weapon.knockbackPower, 220, weapon.attackWidth);
+    }
     this.time.delayedCall(Math.min(190, Math.round(weapon.attackCooldown * 0.45)), () => {
       if (this.playerActionState === 'attacking') this.playerActionState = 'normal';
     });
@@ -2250,27 +2398,28 @@ export class DungeonScene extends Phaser.Scene {
     this.log('护盾启动：3 秒内受到伤害减少 50%。');
   }
 
-  private showWeaponAttackEffect(weapon: WeaponConfig) {
+  private showWeaponAttackEffect(weapon: WeaponConfig, phase = 1) {
     if (weapon.id === 'dual-daggers') {
-      this.showAttackArc(weapon.attackRange, weapon.attackColor, weapon.attackAlpha, 0.62, -18);
-      this.time.delayedCall(55, () => this.showAttackArc(weapon.attackRange * 0.9, weapon.attackColor, weapon.attackAlpha, 0.62, 18));
+      this.showAttackArc(weapon.attackRange * (phase === 1 ? 1 : 0.94), weapon.attackColor, weapon.attackAlpha, 0.54, phase === 1 ? -22 : 22, 135, 3);
       return;
     }
     if (weapon.id === 'spear') {
       const start = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(18));
       const end = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(weapon.attackRange));
-      const line = this.add.line(0, 0, start.x, start.y, end.x, end.y, weapon.attackColor, 0.48).setOrigin(0).setLineWidth(5).setDepth(28);
-      this.tweens.add({ targets: line, alpha: 0, duration: 170, onComplete: () => line.destroy() });
+      const line = this.add.line(0, 0, start.x, start.y, end.x, end.y, weapon.attackColor, 0.5).setOrigin(0).setLineWidth(5).setDepth(28);
+      const tip = this.add.circle(end.x, end.y, 7, 0xeaffff, 0.82).setDepth(28);
+      this.tweens.add({ targets: [line, tip], alpha: 0, duration: 165, onComplete: () => { line.destroy(); tip.destroy(); } });
       return;
     }
-    this.showAttackArc(weapon.attackRange, weapon.attackColor, weapon.attackAlpha, weapon.id === 'heavy-blade' ? 0.58 : 0.42);
+    this.showAttackArc(weapon.attackRange, weapon.attackColor, weapon.attackAlpha, weapon.id === 'heavy-blade' ? 0.66 : 0.42, 0, weapon.id === 'heavy-blade' ? 245 : 190, weapon.id === 'heavy-blade' ? 8 : 4);
+    if (weapon.id === 'heavy-blade') this.cameras.main.shake(70, 0.0025);
   }
 
-  private showAttackArc(range: number, color: number, alpha: number, radiusScale = 0.42, angleOffset = 0) {
+  private showAttackArc(range: number, color: number, alpha: number, radiusScale = 0.42, angleOffset = 0, duration = 190, strokeWidth = 4) {
     const center = new Phaser.Math.Vector2(this.player.x, this.player.y).add(this.lastFacing.clone().scale(range * 0.36));
-    const arc = this.add.arc(center.x, center.y, range * radiusScale, -42, 42, false, color, alpha).setStrokeStyle(4, color, 0.9).setDepth(28);
+    const arc = this.add.arc(center.x, center.y, range * radiusScale, -42, 42, false, color, alpha).setStrokeStyle(strokeWidth, color, 0.9).setDepth(28);
     arc.setRotation(Phaser.Math.Angle.Between(0, 0, this.lastFacing.x, this.lastFacing.y) + Phaser.Math.DegToRad(angleOffset));
-    this.tweens.add({ targets: arc, alpha: 0, scale: 1.18, duration: 190, onComplete: () => arc.destroy() });
+    this.tweens.add({ targets: arc, alpha: 0, scale: 1.18, duration, onComplete: () => arc.destroy() });
   }
 
   private spawnDashTrail() {
@@ -3221,8 +3370,8 @@ export class DungeonScene extends Phaser.Scene {
       if (reward) {
         this.grantReward(reward);
         this.showRewardParticles('rare');
-        this.showFloatingText(this.player.x, this.player.y - 106, `获得：${reward.name}`, '#8ffcff');
-        this.log(`精英巡逻掉落：${reward.name}。`);
+        this.showFloatingText(this.player.x, this.player.y - 106, `获得：${this.getRewardDisplayName(reward)}`, '#8ffcff');
+        this.log(`精英巡逻掉落：${this.getRewardDisplayName(reward)}。`);
       }
     }
     this.eventCombatGoldReward = 0;
@@ -3322,9 +3471,9 @@ export class DungeonScene extends Phaser.Scene {
     rect.on('pointerdown', () => this.chooseRewardByIndex(index));
     card.add(rect);
     card.add(this.add.text(-88, -94, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
-    card.add(this.add.text(0, -92, reward.name, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', align: 'center', wordWrap: { width: 168 } }).setOrigin(0.5));
+    card.add(this.add.text(0, -92, this.getRewardDisplayName(reward), { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', align: 'center', wordWrap: { width: 168 } }).setOrigin(0.5));
     card.add(this.add.text(0, -58, `${reward.rarity.toUpperCase()} · ${reward.type}`, { fontFamily: 'monospace', fontSize: '13px', color: reward.rarity === 'common' ? '#c8d8e8' : reward.rarity === 'rare' ? '#8ffcff' : '#d9b8ff' }).setOrigin(0.5));
-    card.add(this.add.text(-82, -26, reward.description, { fontFamily: 'monospace', fontSize: '13px', color: '#dff7ff', wordWrap: { width: 164 }, lineSpacing: 4 }));
+    card.add(this.add.text(-82, -26, this.getRewardDisplayDescription(reward), { fontFamily: 'monospace', fontSize: '13px', color: '#dff7ff', wordWrap: { width: 164 }, lineSpacing: 4 }));
     card.add(this.add.rectangle(0, 74, 166, 38, 0x07101e, 0.82).setStrokeStyle(1, color, 0.72));
     card.add(this.add.text(0, 74, reward.effectText, { fontFamily: 'monospace', fontSize: '13px', color: '#ffe6ad', align: 'center', wordWrap: { width: 152 } }).setOrigin(0.5));
     return card;
@@ -3338,8 +3487,8 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardChoiceCount += 1;
     this.sfx.play('pickup');
     this.showRewardParticles(reward.rarity);
-    this.showFloatingText(this.player.x, this.player.y - 76, `获得：${reward.name} ${reward.effectText}`, reward.rarity === 'epic' ? '#d9b8ff' : '#8ffcff');
-    this.log(`获得遗物：${reward.name}，${reward.effectText}。`);
+    this.showFloatingText(this.player.x, this.player.y - 76, `获得：${this.getRewardDisplayName(reward)} ${reward.effectText}`, reward.rarity === 'epic' ? '#d9b8ff' : '#8ffcff');
+    this.log(`获得遗物：${this.getRewardDisplayName(reward)}，${reward.effectText}。`);
     this.rewardPanel?.destroy();
     this.rewardPanel = undefined;
     this.activeRewardChoices = [];
@@ -3357,7 +3506,7 @@ export class DungeonScene extends Phaser.Scene {
     reward.apply(this);
     this.relicState.relics.push(reward);
     if (reward.rarity === 'epic') this.epicRewardsTaken += 1;
-    this.itemsObtained.push(reward.name);
+    this.itemsObtained.push(this.getRewardDisplayName(reward));
   }
 
   private showRewardParticles(rarity: RewardRarity) {
@@ -3433,14 +3582,21 @@ export class DungeonScene extends Phaser.Scene {
     this.physics.world.pause();
     this.setGameplayUiVisible(false);
     this.setWorldVisible(false);
+    this.selectedHero = DEFAULT_HERO;
 
     this.weaponPanel = this.add.container(480, 300).setDepth(225);
     this.weaponPanel.add(this.add.rectangle(0, 0, 820, 500, 0x07101e, 0.97).setStrokeStyle(2, 0x35e7c4, 0.95));
     this.weaponPanel.add(this.add.text(0, -220, '选择初始武器', { fontFamily: 'monospace', fontSize: '32px', color: '#ffffff' }).setOrigin(0.5));
-    this.weaponPanel.add(this.add.text(0, -188, '本局武器固定。按 1 / 2 / 3 / 4 或点击卡牌选择。', { fontFamily: 'monospace', fontSize: '15px', color: '#8ffcff' }).setOrigin(0.5));
-    WEAPONS.forEach((weapon, index) => {
+    this.weaponPanel.add(this.add.text(0, -188, `当前角色：${this.selectedHero.name}。本局武器固定，按 1 / 2 / 3 / 4 或点击卡牌选择。`, { fontFamily: 'monospace', fontSize: '15px', color: '#8ffcff' }).setOrigin(0.5));
+    this.getCurrentHeroWeapons().forEach((weapon, index) => {
       this.weaponPanel?.add(this.createWeaponCard(weapon, index));
     });
+  }
+
+  private getCurrentHeroWeapons() {
+    const hero = this.selectedHero ?? DEFAULT_HERO;
+    const weapons = hero.allowedWeaponIds.map((id) => getWeaponById(id)).filter(Boolean);
+    return weapons.length > 0 ? weapons : [getWeaponById(hero.defaultWeaponId)];
   }
 
   private createWeaponCard(weapon: WeaponConfig, index: number) {
@@ -3453,6 +3609,7 @@ export class DungeonScene extends Phaser.Scene {
     card.add(rect);
     card.add(this.add.text(-76, -146, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
     card.add(this.add.text(0, -128, weapon.name, { fontFamily: 'monospace', fontSize: '24px', color: '#ffffff' }).setOrigin(0.5));
+    card.add(this.createWeaponCardPreview(weapon));
     card.add(this.add.text(0, -98, weapon.role, { fontFamily: 'monospace', fontSize: '14px', color: '#8ffcff' }).setOrigin(0.5));
     card.add(this.add.text(-70, -70, weapon.description, { fontFamily: 'monospace', fontSize: '11px', color: '#dff7ff', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
     card.add(this.add.text(-70, -18, `优点：${weapon.pros}`, { fontFamily: 'monospace', fontSize: '11px', color: '#ffe6ad', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
@@ -3470,8 +3627,30 @@ export class DungeonScene extends Phaser.Scene {
     ].join('\n');
   }
 
+  private createWeaponCardPreview(weapon: WeaponConfig) {
+    const preview = this.add.graphics();
+    const x = 46;
+    const y = -116;
+    preview.lineStyle(2, 0x06101a, 0.9);
+    if (weapon.id === 'heavy-blade') {
+      preview.fillStyle(0xffd28a, 0.95).fillTriangle(x + 20, y - 3, x - 12, y - 13, x - 12, y + 9);
+      preview.lineStyle(2, 0xfff1c8, 0.9).strokeTriangle(x + 20, y - 3, x - 12, y - 13, x - 12, y + 9);
+    } else if (weapon.id === 'spear') {
+      preview.lineStyle(4, 0x8b6944, 0.95).lineBetween(x - 24, y, x + 16, y);
+      preview.fillStyle(0x8ffcff, 0.96).fillTriangle(x + 28, y, x + 16, y - 6, x + 16, y + 6);
+    } else if (weapon.id === 'dual-daggers') {
+      preview.lineStyle(4, 0xf0d8ff, 0.95).lineBetween(x - 18, y + 2, x, y - 10);
+      preview.lineStyle(4, 0xf0d8ff, 0.95).lineBetween(x + 4, y - 10, x + 22, y + 2);
+    } else {
+      preview.lineStyle(4, 0xf5ffff, 0.95).lineBetween(x - 18, y + 4, x + 18, y - 8);
+      preview.lineStyle(3, 0x35e7c4, 0.8).lineBetween(x - 8, y - 7, x + 2, y + 8);
+    }
+    return preview;
+  }
+
   private chooseWeapon(index: number) {
-    const weapon = WEAPONS[index] ?? DEFAULT_WEAPON;
+    const weapons = this.getCurrentHeroWeapons();
+    const weapon = weapons[index] ?? getWeaponById(this.selectedHero.defaultWeaponId);
     this.selectedWeapon = weapon;
     this.weaponPanel?.destroy();
     this.weaponPanel = undefined;
@@ -3640,7 +3819,7 @@ export class DungeonScene extends Phaser.Scene {
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
-    const recentRelics = this.relicState.relics.slice(-3).map((relic) => relic.name).join(' / ') || 'None';
+    const recentRelics = this.relicState.relics.slice(-3).map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
     const statuses = [
       this.poisonRooms > 0 ? `Poison ${this.poisonRooms} room` : '',
       this.rustRooms > 0 ? `Rust ${this.rustRooms} room` : '',
@@ -3936,7 +4115,9 @@ export class DungeonScene extends Phaser.Scene {
       id: `lingxu-${endedAt}`,
       levelId: this.level.id,
       classId: this.playerClass.id,
-      className: '遗迹猎人',
+      className: this.selectedHero.name,
+      heroId: this.selectedHero.id,
+      heroName: this.selectedHero.name,
       startedAt: new Date(this.startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
       durationSeconds,
@@ -3963,7 +4144,8 @@ export class DungeonScene extends Phaser.Scene {
       wasCursed: this.eventStats.cursed,
       weaponId: this.selectedWeapon.id,
       weaponName: this.selectedWeapon.name,
-      weaponStyle: this.selectedWeapon.styleSummary
+      weaponStyle: this.selectedWeapon.styleSummary,
+      weaponSummary: this.selectedWeapon.styleSummary
     };
     storageService.saveRun(run);
     this.setGameplayUiVisible(false);
@@ -3973,7 +4155,7 @@ export class DungeonScene extends Phaser.Scene {
     this.settlementPanel = panel;
     panel.add(this.add.rectangle(0, 0, 720, 470, 0x07101e, 0.98).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
     panel.add(this.add.text(-310, -205, victory ? '源晶已净化' : '遗迹探索终止', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }));
-    const relicNames = this.relicState.relics.map((relic) => relic.name).join(' / ') || 'None';
+    const relicNames = this.relicState.relics.map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
     const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? 'Yes' : 'No';
     panel.add(this.add.text(-310, -160, [
       `Result: ${victory ? 'Victory' : 'Defeat'}`,
@@ -3984,6 +4166,7 @@ export class DungeonScene extends Phaser.Scene {
       `Rooms: ${visitedRooms.length}  Events: ${this.eventStats.triggered}  Elite Rooms: ${this.getEliteRoomsVisited()}`,
       `Negative Events: ${this.eventStats.negative}  Combat Events: ${this.eventStats.combat}`,
       `Statuses: ${this.eventStats.poisoned ? 'Poisoned' : 'No poison'} / ${this.eventStats.cursed ? 'Cursed' : 'No curse'}`,
+      `Hero: ${this.selectedHero.name}`,
       `Weapon: ${this.selectedWeapon.name}  Style: ${this.selectedWeapon.styleSummary}`,
       `Reward Choices: ${this.rewardChoiceCount}  Relics: ${this.relicState.relics.length}`,
       `Route: ${routeSummary}`,
