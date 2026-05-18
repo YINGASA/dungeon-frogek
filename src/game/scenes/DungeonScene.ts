@@ -914,6 +914,8 @@ export class DungeonScene extends Phaser.Scene {
   private rewardChoiceCount = 0;
   public relicState: PlayerRelicState = this.createDefaultRelicState();
   private epicRewardsTaken = 0;
+  private lastLogMessage = '';
+  private lastLogAt = 0;
   private lastFacing = new Phaser.Math.Vector2(1, 0);
   private playerDirection: HunterDirection = 'down';
   private playerWalkFrame: HunterFrame = 'idle';
@@ -1131,7 +1133,7 @@ export class DungeonScene extends Phaser.Scene {
     this.unitHuds.clear();
     this.createUnitHud(this.player);
     this.loadRoom(0);
-    this.log('进入灵墟。按 E 进入下一房间，战斗房必须清空后才能继续。');
+    this.log('进入灵墟。WASD/方向键移动，J 攻击，K 冲刺斩，L 护盾，I 查看状态。');
     this.updateUi(this.time.now);
   }
 
@@ -1543,8 +1545,8 @@ export class DungeonScene extends Phaser.Scene {
     const targetLength = Phaser.Math.Between(6, 8);
     const maxOptionalRooms = targetLength >= 7 ? 2 : 1;
     const optionalKinds = Phaser.Utils.Array.Shuffle([
-      ...(Phaser.Math.Between(1, 100) <= 55 ? ['event' as RoomKind] : []),
-      ...(Phaser.Math.Between(1, 100) <= 75 ? ['treasure' as RoomKind] : [])
+      ...(Phaser.Math.Between(1, 100) <= 50 ? ['event' as RoomKind] : []),
+      ...(Phaser.Math.Between(1, 100) <= 68 ? ['treasure' as RoomKind] : [])
     ]).slice(0, maxOptionalRooms);
     if (optionalKinds.length === 0) optionalKinds.push('treasure');
 
@@ -1554,7 +1556,7 @@ export class DungeonScene extends Phaser.Scene {
     for (let index = 0; index < middleCount; index += 1) {
       if (index === 0) backboneKinds.push('battle');
       else if (index === eliteSlot) backboneKinds.push('elite');
-      else backboneKinds.push(Phaser.Math.Between(1, 100) <= 24 ? 'elite' : 'battle');
+      else backboneKinds.push(Phaser.Math.Between(1, 100) <= (index >= middleCount - 1 ? 28 : 18) ? 'elite' : 'battle');
     }
     if (backboneKinds.filter((kind) => kind === 'battle').length < 2) {
       for (let index = backboneKinds.length - 1; index > 0; index -= 1) {
@@ -1723,6 +1725,8 @@ export class DungeonScene extends Phaser.Scene {
     this.eventCombatRareRewardChance = 0;
     this.relicState = this.createDefaultRelicState();
     this.epicRewardsTaken = 0;
+    this.lastLogMessage = '';
+    this.lastLogAt = 0;
     this.lowHpWarningActive = false;
     this.lowHpVignette?.setVisible(false);
     this.activeRewardChoices = [];
@@ -1915,7 +1919,17 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.currentRoom.kind === 'event' && !this.currentRoom.eventResolved) this.time.delayedCall(420, () => this.openEventChoice());
-    this.log(this.currentRoom.kind === 'start' ? '出生房安全。按 E 进入普通战斗房。' : `${this.getRoomDisplayName()}：${this.currentRoom.description}`);
+    this.log(this.getRoomEntryLog());
+  }
+
+  private getRoomEntryLog() {
+    if (this.currentRoom.kind === 'start') return '出生房安全。按 E 进入下一房间。';
+    if (this.currentRoom.kind === 'battle') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 清空敌人后传送门开启。`;
+    if (this.currentRoom.kind === 'elite') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 多波敌人会逐步增强。`;
+    if (this.currentRoom.kind === 'treasure') return '封尘宝库：打开宝箱后开启传送门。';
+    if (this.currentRoom.kind === 'event') return '事件房：完成事件后开启传送门，结果可能有风险也可能有收益。';
+    if (this.currentRoom.kind === 'boss') return '首领房：击败 Boss 完成本层，注意站桩惩罚和技能预警。';
+    return `${this.getRoomDisplayName()}：${this.currentRoom.description}`;
   }
 
   private claimRestRoomSupply() {
@@ -2332,7 +2346,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     const trueEliteRoom = this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳');
-    const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 45 ? 3 : 2;
+    const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 30 ? 3 : 2;
     const waves: CombatWave[] = [];
     waves.push(this.pickEnemyMix(depth, trueEliteRoom ? 3 : 2));
     if (waveCount >= 2) {
@@ -2364,7 +2378,9 @@ export class DungeonScene extends Phaser.Scene {
     this.spawnEnemies(wave);
     const waveText = `第 ${this.currentWaveIndex + 1} / ${this.combatWaves.length} 波`;
     this.showWaveToast(waveText);
-    this.log(this.currentWaveIndex === 0 ? `第 1 波敌人出现。` : `源晶波动增强，第 ${this.currentWaveIndex + 1} 波敌人出现。`);
+    this.log(this.currentWaveIndex === 0
+      ? `第 1 波敌人出现。战斗房必须清空敌人后才能开启传送门。`
+      : `源晶波动增强，第 ${this.currentWaveIndex + 1} 波敌人出现。`);
   }
 
   private scheduleNextWave() {
@@ -2386,7 +2402,9 @@ export class DungeonScene extends Phaser.Scene {
         this.scheduleNextWave();
         return;
       }
-      this.log('所有敌人已清除。');
+      this.log(this.currentRoom.kind === 'elite'
+        ? `${this.getRoomTypeLabel()}清除，获得高级奖励。`
+        : '普通战斗房清除，获得战斗奖励。');
       this.openRewardChoice(this.currentRoom.kind);
       return;
     }
@@ -3879,7 +3897,8 @@ export class DungeonScene extends Phaser.Scene {
     else this.showFloatingText(this.player.x, this.player.y - 34, 'Shield', '#8ffcff');
     this.showPlayerDamageFeedback(damage, skillShieldAbsorb + shieldAbsorb);
     this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
-    this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? 'L 护盾减免了伤害。' : ''}${shieldAbsorb > 0 ? `临时护盾抵消 ${shieldAbsorb} 点。` : ''}`);
+    const absorbed = skillShieldAbsorb + shieldAbsorb;
+    this.log(`${reason}造成 ${damage} 点伤害。${absorbed > 0 ? `护盾吸收了 ${absorbed} 点伤害。` : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
     return true;
   }
@@ -4019,8 +4038,8 @@ export class DungeonScene extends Phaser.Scene {
     if (trigger === 'treasure') return;
     const trueElite = trigger === 'elite' && this.currentRoom.name.includes('精英');
     const gold = trigger === 'battle'
-      ? Phaser.Math.Between(8, 16)
-      : trueElite ? Phaser.Math.Between(24, 36) : Phaser.Math.Between(16, 24);
+      ? Phaser.Math.Between(7, 14)
+      : trueElite ? Phaser.Math.Between(24, 34) : Phaser.Math.Between(16, 22);
     this.gold += gold;
     this.showFloatingText(this.player.x, this.player.y - 98, `Gold +${gold}`, '#ffe6ad');
   }
@@ -4028,9 +4047,9 @@ export class DungeonScene extends Phaser.Scene {
   private rollRewardChoices(trigger: RewardTrigger) {
     const trueElite = trigger === 'elite' && this.currentRoom.name.includes('精英');
     const rarityPlan: RewardRarity[] = trigger === 'battle'
-      ? ['common', 'common', Phaser.Math.Between(1, 100) <= 42 ? 'rare' : 'common']
+      ? ['common', 'common', Phaser.Math.Between(1, 100) <= 38 ? 'rare' : 'common']
       : trigger === 'treasure'
-        ? ['common', 'common', Phaser.Math.Between(1, 100) <= 38 ? 'rare' : 'common']
+        ? ['common', 'common', Phaser.Math.Between(1, 100) <= 30 ? 'rare' : 'common']
         : trueElite
           ? ['rare', 'rare', Phaser.Math.Between(1, 100) <= 72 && this.epicRewardsTaken < 2 ? 'epic' : 'rare']
           : ['rare', 'rare', Phaser.Math.Between(1, 100) <= 32 && this.epicRewardsTaken < 2 ? 'epic' : 'rare'];
@@ -4297,7 +4316,7 @@ export class DungeonScene extends Phaser.Scene {
       this.spawnEnemies();
       return;
     }
-    if (result.opensPortal !== false) this.openPortal('Event complete. Portal opened. Press E to choose the next room.');
+    if (result.opensPortal !== false) this.openPortal('事件完成。传送门已开启，按 E 进入下一房间。');
   }
 
   private pickEventPackEvent() {
@@ -4312,8 +4331,9 @@ export class DungeonScene extends Phaser.Scene {
     });
     const weighted = candidates.map((event) => {
       let weight = event.weight;
-      if (hpRatio < 0.35 && event.category === 'supply') weight += 8;
-      if (hpRatio < 0.25 && (event.category === 'penalty' || event.category === 'combat')) weight = Math.max(1, Math.floor(weight * 0.55));
+      if (hpRatio < 0.35 && event.category === 'supply') weight += 10;
+      if (hpRatio < 0.3 && (event.category === 'penalty' || event.category === 'combat')) weight = Math.max(1, Math.floor(weight * 0.45));
+      if (roomNumber >= this.getDisplayTotalRooms() - 1 && event.category === 'supply') weight += 3;
       return { event, weight };
     });
     const total = weighted.reduce((sum, item) => sum + item.weight, 0);
@@ -4455,7 +4475,8 @@ export class DungeonScene extends Phaser.Scene {
       '[E] 互动  [Esc] 暂停  [R] 重开'
     ]);
     this.roomText.setText([
-      `${this.getDisplayRoomNumber()}/${this.getDisplayTotalRooms()} ${this.getRoomDisplayName()}`,
+      `第 ${this.getDisplayRoomNumber()}/${this.getDisplayTotalRooms()} 房`,
+      this.getRoomTypeLabel(),
       this.getWaveHudText(),
       this.getContextHint(),
       this.getNearbyBranchHint(),
@@ -4473,6 +4494,7 @@ export class DungeonScene extends Phaser.Scene {
     if (this.roomCleared) return this.currentRoom.nextOptions.length > 1 ? '分支传送门：靠近目标按 E' : '传送门：已开启，按 E 进入';
     if (this.currentRoom.kind === 'treasure') return '传送门：打开封尘宝库后开启';
     if (this.currentRoom.kind === 'event') return '传送门：完成事件后开启';
+    if (this.currentRoom.kind === 'boss') return '击败 Boss 完成本层';
     return '传送门：清除敌人后开启';
   }
 
@@ -4489,7 +4511,7 @@ export class DungeonScene extends Phaser.Scene {
       .sort((a, b) => a.distance - b.distance)[0];
     if (!nearest || nearest.distance > 110) return '';
     const target = this.dungeonRoute[this.currentRoom.nextOptions[nearest.index]];
-    return `按 E 前往：${this.getRoomDisplayName(target)}`;
+    return `靠近目标传送门，按 E 进入：${this.getRoomDisplayName(target)}`;
   }
 
   private showRoomTitle() {
@@ -4669,6 +4691,9 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private log(message: string) {
+    if (message === this.lastLogMessage && this.time.now - this.lastLogAt < 650) return;
+    this.lastLogMessage = message;
+    this.lastLogAt = this.time.now;
     this.logText.setText(`战斗日志：${message}`);
   }
 
@@ -4781,26 +4806,17 @@ export class DungeonScene extends Phaser.Scene {
     const relicNames = this.relicState.relics.map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
     const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? 'Yes' : 'No';
     panel.add(this.add.text(-310, -160, [
-      `Result: ${victory ? 'Victory' : 'Defeat'}`,
-      `Duration: ${durationSeconds}s`,
-      `Kills: ${this.kills}`,
-      `Damage Taken: ${this.damageTaken}`,
-      `Skill Uses: ${this.skillUses}`,
-      `Rooms: ${visitedRooms.length}  Events: ${this.eventStats.triggered}  Elite Rooms: ${this.getEliteRoomsVisited()}`,
-      `Negative Events: ${this.eventStats.negative}  Combat Events: ${this.eventStats.combat}`,
-      `Statuses: ${this.eventStats.poisoned ? 'Poisoned' : 'No poison'} / ${this.eventStats.cursed ? 'Cursed' : 'No curse'}`,
-      `Hero: ${this.selectedHero.name}`,
-      `使用武器：${this.selectedWeapon.name}`,
-      `流派：${this.selectedWeapon.styleSummary}`,
-      `Reward Choices: ${this.rewardChoiceCount}  Relics: ${this.relicState.relics.length}`,
-      `Route: ${routeSummary}`,
-      `Epic Relic: ${hasEpic}`,
-      `Relic List: ${relicNames}`,
-      `Final HP: ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK: ${this.player.stats.atk}  DEF: ${this.player.stats.def}`,
-      `Build: ${this.getBuildSummary()}`,
-      `Reason: ${run.deathReason}`,
-      `Grade: ${grade}`
-    ], { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 4, wordWrap: { width: 620 } }));
+      `结果：${victory ? '胜利' : '失败'}    评级：${grade}    用时：${durationSeconds}s`,
+      `房间：${visitedRooms.length}    击败：${this.kills}    精英房：${this.getEliteRoomsVisited()}    事件：${this.eventStats.triggered}`,
+      `伤害承受：${this.damageTaken}    技能使用：${this.skillUses}    奖励选择：${this.rewardChoiceCount}`,
+      `武器：${this.selectedWeapon.name}    流派：${this.selectedWeapon.styleSummary}    构筑：${this.getBuildSummary()}`,
+      `遗物：${this.relicState.relics.length}    Epic：${hasEpic}    金币：${this.gold}`,
+      `异常：${this.eventStats.poisoned ? '中过毒' : '无中毒'} / ${this.eventStats.cursed ? '中过诅咒' : '无诅咒'}    负面事件：${this.eventStats.negative}    战斗事件：${this.eventStats.combat}`,
+      `最终状态：HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK ${this.player.stats.atk}  DEF ${this.player.stats.def}`,
+      `路线：${routeSummary}`,
+      `遗物列表：${relicNames}`,
+      `原因：${run.deathReason}`
+    ], { fontFamily: 'monospace', fontSize: '14px', color: '#dff7ff', lineSpacing: 6, wordWrap: { width: 620 } }));
     panel.add(this.createMenuButton(-105, 198, 170, '重新开始', () => {
       this.settlementPanel?.destroy();
       this.showWeaponSelection();
