@@ -373,14 +373,14 @@ const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = 
 };
 
 const REWARD_POOL: RewardOption[] = [
-  { id: 'suppressor-grip', name: '压制握柄', rarity: 'common', type: '攻击', description: '握柄上的细小源晶棱面让近战攻击更容易把普通怪推出安全距离。', effectText: '近战击退 +8', apply: (scene) => { scene.relicState.normalKnockbackBonus += 8; } },
-  { id: 'dash-whetstone', name: '冲锋磨石', rarity: 'common', type: '攻击', description: '磨石只强化冲刺斩的第一道刃光，收益稳定但不夸张。', effectText: 'K 伤害 +8%', apply: (scene) => { scene.relicState.dashDamageMultiplier += 0.08; } },
+  { id: 'suppressor-grip', name: '压制握柄', rarity: 'common', type: '攻击', description: '握柄上的细小源晶棱面让近战攻击更容易把普通怪推出安全距离。', effectText: '近战击退 +6', apply: (scene) => { scene.relicState.normalKnockbackBonus += 6; } },
+  { id: 'dash-whetstone', name: '冲锋磨石', rarity: 'common', type: '攻击', description: '磨石只强化冲刺斩的第一道刃光，收益稳定但不夸张。', effectText: 'K 伤害 +6%', apply: (scene) => { scene.relicState.dashDamageMultiplier += 0.06; } },
   { id: 'guardian-prism', name: '守护棱镜', rarity: 'rare', type: '生存', description: '棱镜会延长护盾稳定时间，让你多争取一次走位窗口。', effectText: 'L 护盾持续 +0.5s', apply: (scene) => { scene.relicState.shieldDurationBonusMs += 500; } },
   { id: 'still-shield-loop', name: '静盾回流', rarity: 'epic', type: '生存', description: '护盾吸收伤害时会回流少量生命，适合稳健防守。', effectText: '护盾吸收后回复 2 HP', apply: (scene) => { scene.relicState.shieldAbsorbHeal += 2; } },
   { id: 'ember-bandage', name: '余烬绷带', rarity: 'common', type: '回复', description: '清理战斗后，绷带会借余温封住轻伤。', effectText: '战斗清房 HP +2', apply: (scene) => { scene.relicState.roomClearHeal += 2; } },
-  { id: 'battlefield-suture', name: '战场缝线', rarity: 'rare', type: '回复', description: '每次战斗结束后快速处理伤口，回复量不高但很稳定。', effectText: '战斗清房 HP +4', apply: (scene) => { scene.relicState.roomClearHeal += 4; } },
+  { id: 'battlefield-suture', name: '战场缝线', rarity: 'rare', type: '回复', description: '每次战斗结束后快速处理伤口，回复量不高但很稳定。', effectText: '战斗清房 HP +3', apply: (scene) => { scene.relicState.roomClearHeal += 3; } },
   { id: 'coin-sigil', name: '拾金符印', rarity: 'common', type: '技能', description: '符印会在战斗房清理后吸附散落金币。', effectText: '战斗清房金币 +3', apply: (scene) => { scene.relicState.roomClearGoldBonus += 3; } },
-  { id: 'route-ledger', name: '路线账册', rarity: 'rare', type: '技能', description: '账册记录清房收益，让每场战斗多带出一点资源。', effectText: '战斗清房金币 +6', apply: (scene) => { scene.relicState.roomClearGoldBonus += 6; } },
+  { id: 'route-ledger', name: '路线账册', rarity: 'rare', type: '技能', description: '账册记录清房收益，让每场战斗多带出一点资源。', effectText: '战斗清房金币 +5', apply: (scene) => { scene.relicState.roomClearGoldBonus += 5; } },
   { id: 'sharp-blade', name: '锋利剑刃', rarity: 'common', type: '攻击', description: '剑刃重新开锋，普通攻击与冲刺斩基础伤害提高。', effectText: 'ATK +2', apply: (scene) => { scene.player.stats.atk += 2; } },
   { id: 'attack-crystal', name: '攻击晶石', rarity: 'rare', type: '攻击', description: '源晶强化武器核心，但出现频率较低。', effectText: 'ATK +3', apply: (scene) => { scene.player.stats.atk += 3; } },
   { id: 'armor-rune', name: '破甲符文', rarity: 'rare', type: '攻击', description: '普通攻击和冲刺斩额外造成固定伤害。', effectText: '普攻 / 冲刺斩伤害 +2', apply: (scene) => { scene.relicState.bonusDamage += 2; } },
@@ -391,10 +391,10 @@ const REWARD_POOL: RewardOption[] = [
   { id: 'crystal-shield', name: '晶体护盾', rarity: 'rare', type: '生存', description: '进入新房间时生成一层独立临时护盾。', effectText: '每个新房间获得 Shield 10', apply: () => undefined },
   { id: 'source-plate', name: '源晶甲片', rarity: 'epic', type: '生存', description: '源晶甲片削弱普通怪造成的伤害。', effectText: '普通怪伤害 -15%', apply: (scene) => { scene.relicState.damageReductionFromMinions += 0.15; } },
 
-  { id: 'small-potion', name: '小型生命药水', rarity: 'common', type: '回复', description: '立即饮用的应急药剂。', effectText: '立即回复 25 HP', stackable: true, apply: (scene) => { scene.healPlayer(25); } },
-  { id: 'life-drain', name: '生命汲取', rarity: 'rare', type: '回复', description: '击杀普通敌人时抽取微弱生命。', effectText: '击杀普通敌人回复 3 HP', apply: () => undefined },
-  { id: 'potion-belt', name: '药剂腰包', rarity: 'rare', type: '回复', description: '让补给房与药水奖励的治疗更有效。', effectText: '生命药水回复量 +10', apply: (scene) => { scene.relicState.potionHealBonus += 10; } },
-  { id: 'spring-echo', name: '源泉残响', rarity: 'epic', type: '回复', description: '源泉回声只会在进入 Boss 房时触发一次。', effectText: '进入 Boss 房回复 20 HP', apply: () => undefined },
+  { id: 'small-potion', name: '小型生命药水', rarity: 'common', type: '回复', description: '立即饮用的应急药剂。', effectText: '立即回复 22 HP', stackable: true, apply: (scene) => { scene.healPlayer(22); } },
+  { id: 'life-drain', name: '生命汲取', rarity: 'rare', type: '回复', description: '击杀普通敌人时抽取微弱生命。', effectText: '击杀普通敌人回复 2 HP', apply: () => undefined },
+  { id: 'potion-belt', name: '药剂腰包', rarity: 'rare', type: '回复', description: '让补给房与药水奖励的治疗更有效。', effectText: '生命药水回复量 +8', apply: (scene) => { scene.relicState.potionHealBonus += 8; } },
+  { id: 'spring-echo', name: '源泉残响', rarity: 'epic', type: '回复', description: '源泉回声只会在进入 Boss 房时触发一次。', effectText: '进入 Boss 房回复 18 HP', apply: () => undefined },
 
   { id: 'swift-boots', name: '疾步靴', rarity: 'common', type: '技能', description: '脚步变轻，更容易拉开敌人攻击前摇。', effectText: '移动速度 +10%', apply: (scene) => { scene.relicState.moveSpeedMultiplier += 0.1; } },
   { id: 'cooldown-core', name: '冷却核心', rarity: 'rare', type: '技能', description: '降低 K 冲刺斩与 L 护盾的冷却。', effectText: 'K / L 冷却 -10%', apply: (scene) => { scene.relicState.cooldownReduction = Math.min(0.35, scene.relicState.cooldownReduction + 0.1); } },
@@ -569,16 +569,16 @@ const EVENT_PACK: EventPackDef[] = [
     description: '倒塌的武器架里还有一把能用的源晶短刃。',
     category: 'benefit',
     rarity: 'common',
-    weight: 10,
+    weight: 8,
     effectType: 'attack',
-    effectText: '获得 ATK +2。',
+    effectText: '获得 ATK +1。',
     followUpObjective: '整理武器后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      scene.player.stats.atk += 2;
+      scene.player.stats.atk += 1;
       return {
-        log: '你从破损武器架中找到可用武器，ATK +2。',
-        floatingText: 'ATK +2',
+        log: '你从破损武器架中找到可用武器，ATK +1。',
+        floatingText: 'ATK +1',
         opensPortal: true
       };
     }
@@ -589,7 +589,7 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一只旧箱子半埋在灰尘里，里面留着还能装配的护甲片。',
     category: 'benefit',
     rarity: 'common',
-    weight: 10,
+    weight: 8,
     effectType: 'defense',
     effectText: '获得 DEF +1。',
     followUpObjective: '装好护甲后继续前进。',
@@ -611,11 +611,11 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 10,
     effectType: 'gold',
-    effectText: '获得 15-30 金币。',
+    effectText: '获得 12-24 金币。',
     followUpObjective: '收起金币后通道开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const gold = Phaser.Math.Between(15, 30);
+      const gold = Phaser.Math.Between(12, 24);
       scene.gold += gold;
       return {
         log: '你发现了遗失的钱袋。',
@@ -630,14 +630,14 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一眼源晶泉水仍未被完全污染，清亮的光晕缓慢荡开。',
     category: 'supply',
     rarity: 'rare',
-    weight: 5,
+    weight: 4,
     effectType: 'heal',
-    effectText: '回复 20-30 HP；低于 35% HP 时额外回复 10 HP。',
+    effectText: '回复 16-24 HP；低于 35% HP 时额外回复 8 HP。',
     followUpObjective: '恢复后继续深入。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const baseHeal = Phaser.Math.Between(20, 30);
-      const lowHpBonus = scene.player.stats.hp / scene.player.stats.maxHp < 0.35 ? 10 : 0;
+      const baseHeal = Phaser.Math.Between(16, 24);
+      const lowHpBonus = scene.player.stats.hp / scene.player.stats.maxHp < 0.35 ? 8 : 0;
       const healed = scene.healPlayer(baseHeal + lowHpBonus);
       return {
         log: '源晶治疗泉恢复了你的生命。',
@@ -654,11 +654,11 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 4,
     effectType: 'potion-box',
-    effectText: '回复 12-18 HP，受药剂遗物加成影响。',
+    effectText: '回复 10-15 HP，受药剂遗物加成影响。',
     followUpObjective: '使用药剂后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const healed = scene.healPlayer(Phaser.Math.Between(12, 18) + scene.relicState.potionHealBonus);
+      const healed = scene.healPlayer(Phaser.Math.Between(10, 15) + scene.relicState.potionHealBonus);
       return {
         log: '你在废弃药剂箱中找到一支还能使用的药剂。',
         floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
@@ -674,11 +674,11 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 6,
     effectType: 'potion-box',
-    effectText: '回复 14-22 HP，但获得中毒 1 房。',
+    effectText: '回复 12-18 HP，但获得中毒 1 房。',
     followUpObjective: '药性稳定后，传送门会重新开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const healed = scene.healPlayer(Phaser.Math.Between(14, 22) + scene.relicState.potionHealBonus);
+      const healed = scene.healPlayer(Phaser.Math.Between(12, 18) + scene.relicState.potionHealBonus);
       scene.applyPoison(1);
       return {
         log: `你饮下破损药锅里的残液，回复 ${healed} HP，但毒雾也钻进了肺里。`,
@@ -695,17 +695,17 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 8 点伤害，并获得 1 个 common 或 rare 奖励。',
+    effectText: '受到 10 点伤害，并获得 1 个 common 或 rare 奖励。',
     followUpObjective: '封印吞下血迹后，通道会重新显现。',
     roomTags: ['event'],
     minRoomIndex: 2,
     applyEffect: (scene) => {
-      scene.applySafeEventDamage(8, '封印祭坛');
-      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 28 ? 'rare' : 'common', []);
+      scene.applySafeEventDamage(10, '封印祭坛');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 22 ? 'rare' : 'common', []);
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `封印祭坛抽走了少量生命，并吐出一缕可用力量：${scene.getRewardDisplayName(reward)}。` : '封印祭坛抽走了少量生命，但回声很快散尽。',
-        floatingText: reward ? `-8 HP / ${scene.getRewardDisplayName(reward)}` : '-8 HP',
+        floatingText: reward ? `-10 HP / ${scene.getRewardDisplayName(reward)}` : '-10 HP',
         opensPortal: true
       };
     }
@@ -718,20 +718,20 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 6,
     effectType: 'ambush',
-    effectText: '大多时候获得 12-24 金币，少数时候触发伏击。',
+    effectText: '大多时候获得 10-20 金币，少数时候触发伏击。',
     followUpObjective: '搜刮完成，或击退被惊动的怪物。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      if (Phaser.Math.Between(1, 100) <= 28) {
+      if (Phaser.Math.Between(1, 100) <= 32) {
         return {
           log: '你刚解开旧背包，墙缝里的怪物就被金属碰撞声惊醒。',
           floatingText: '搜刮惊动伏击',
           enemies: ['bat', 'slime'],
-          goldReward: 8,
+          goldReward: 6,
           opensPortal: false
         };
       }
-      const gold = Phaser.Math.Between(12, 24);
+      const gold = Phaser.Math.Between(10, 20);
       scene.gold += gold;
       return {
         log: `你从旧背包里翻出还能使用的金币，获得 ${gold} 金币。`,
@@ -748,16 +748,16 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'gold',
-    effectText: '损失 6 HP，获得 18-30 金币。',
+    effectText: '损失 8 HP，获得 16-26 金币。',
     followUpObjective: '低语退去后，继续深入地牢。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const gold = Phaser.Math.Between(18, 30);
-      scene.applySafeEventDamage(6, '裂隙低语');
+      const gold = Phaser.Math.Between(16, 26);
+      scene.applySafeEventDamage(8, '裂隙低语');
       scene.gold += gold;
       return {
         log: `裂隙低语灼伤了你的意志，但留下 ${gold} 枚带着余温的金币。`,
-        floatingText: `-6 HP / 金币 +${gold}`,
+        floatingText: `-8 HP / 金币 +${gold}`,
         opensPortal: true
       };
     }
@@ -768,13 +768,13 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一堆快要熄灭的营火仍残留着一点温度，灰烬旁刻着匆忙留下的安全记号。',
     category: 'supply',
     rarity: 'common',
-    weight: 5,
+    weight: 4,
     effectType: 'heal',
-    effectText: '回复 10-18 HP；若生命已满，仅获得一条安全日志。',
+    effectText: '回复 8-14 HP；若生命已满，仅获得一条安全日志。',
     followUpObjective: '短暂休整后，传送门会稳定下来。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const healed = scene.healPlayer(Phaser.Math.Between(10, 18));
+      const healed = scene.healPlayer(Phaser.Math.Between(8, 14));
       return {
         log: healed > 0 ? `你在熄灭的营火旁短暂休整，回复 ${healed} HP。` : '营火只剩余温，但墙上的安全记号让你确认前路暂时稳定。',
         floatingText: healed > 0 ? `HP +${healed}` : '前路暂时安全',
@@ -788,17 +788,17 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一束洁白源光穿过穹顶裂缝，短暂压住了污染回声。',
     category: 'supply',
     rarity: 'rare',
-    weight: 4,
+    weight: 3,
     effectType: 'cleanse',
-    effectText: '清除中毒或锈蚀；若没有异常状态，获得 10 点临时护盾。',
+    effectText: '清除中毒或锈蚀；若没有异常状态，获得 8 点临时护盾。',
     followUpObjective: '净化完成后通道开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
       const cleansed = scene.cleanseNegativeStatuses();
-      if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 10);
+      if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 8);
       return {
-        log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 10 点临时护盾。',
-        floatingText: cleansed ? '异常状态已清除' : 'Shield 10',
+        log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 8 点临时护盾。',
+        floatingText: cleansed ? '异常状态已清除' : 'Shield 8',
         opensPortal: true
       };
     }
@@ -852,16 +852,16 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 8 点伤害，并获得随机 common 或 rare 奖励。',
+    effectText: '受到 10 点伤害，并获得随机 common 或 rare 奖励。',
     followUpObjective: '吸收残余能量后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      scene.applySafeEventDamage(8, '不稳定源晶');
-      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 70 ? 'common' : 'rare', []);
+      scene.applySafeEventDamage(10, '不稳定源晶');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 78 ? 'common' : 'rare', []);
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${scene.getRewardDisplayName(reward)}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
-        floatingText: reward ? `-${8} HP / ${scene.getRewardDisplayName(reward)}` : '-8 HP',
+        floatingText: reward ? `-10 HP / ${scene.getRewardDisplayName(reward)}` : '-10 HP',
         opensPortal: true
       };
     }
@@ -1713,7 +1713,7 @@ export class DungeonScene extends Phaser.Scene {
     for (let index = 0; index < middleCount; index += 1) {
       if (index === 0) backboneKinds.push('battle');
       else if (index === eliteSlot) backboneKinds.push('elite');
-      else backboneKinds.push(Phaser.Math.Between(1, 100) <= (index >= middleCount - 1 ? 28 : 18) ? 'elite' : 'battle');
+      else backboneKinds.push(Phaser.Math.Between(1, 100) <= (index >= middleCount - 1 ? 22 : 16) ? 'elite' : 'battle');
     }
     if (backboneKinds.filter((kind) => kind === 'battle').length < 2) {
       for (let index = backboneKinds.length - 1; index > 0; index -= 1) {
@@ -2114,9 +2114,9 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (this.currentRoom.kind === 'boss' && this.hasRelic('spring-echo') && !this.relicState.bossRoomHealUsed) {
       this.relicState.bossRoomHealUsed = true;
-      this.healPlayer(20);
-      this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 HP +20', '#d6b4ff');
-      this.log('源泉残响触发：进入 Boss 房回复 20 HP。');
+      this.healPlayer(18);
+      this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 HP +18', '#d6b4ff');
+      this.log('源泉残响触发：进入 Boss 房回复 18 HP。');
     }
   }
 
@@ -2503,8 +2503,8 @@ export class DungeonScene extends Phaser.Scene {
     if (this.currentRoom.kind === 'battle') {
       if (roomName.includes('蝠群突袭')) {
         return depth < 0.5
-          ? [['bat', 'bat'], ['slime']]
-          : [['bat', 'slime'], ['bat', 'bat']];
+          ? [['bat', 'slime'], ['bat']]
+          : [['bat', 'slime'], ['bat', 'slime']];
       }
       if (roomName.includes('骷髅守卫压制')) {
         return depth < 0.55
@@ -2523,7 +2523,7 @@ export class DungeonScene extends Phaser.Scene {
       return [['slime', 'skeleton'], ['archer', Phaser.Math.Between(1, 100) <= 50 ? 'bat' : 'slime']];
     }
     if (roomName.includes('精英护卫')) {
-      return [['slime', 'bat'], [{ kind: 'skeleton', elite: true }, Phaser.Math.Between(1, 100) <= 55 ? 'slime' : 'bat']];
+      return [['slime', 'skeleton'], [{ kind: 'skeleton', elite: true }, Phaser.Math.Between(1, 100) <= 65 ? 'slime' : 'bat']];
     }
     const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 30 ? 3 : 2;
     const waves: CombatWave[] = [];
@@ -2567,7 +2567,7 @@ export class DungeonScene extends Phaser.Scene {
     this.waveTransitionPending = true;
     this.log('源晶波动增强，下一波敌人出现！');
     this.showWaveToast('源晶波动增强，下一波敌人出现！');
-    this.time.delayedCall(Phaser.Math.Between(800, 1200), () => {
+    this.time.delayedCall(Phaser.Math.Between(950, 1350), () => {
       if (this.runEnded || this.flowState !== 'playing') return;
       this.currentWaveIndex += 1;
       this.waveTransitionPending = false;
@@ -3894,8 +3894,8 @@ export class DungeonScene extends Phaser.Scene {
     this.kills += 1;
     this.gold += wasBoss ? 60 : 8;
     if (!wasBoss && this.hasRelic('life-drain')) {
-      this.healPlayer(3);
-      this.log(`生命汲取触发：击杀 ${name} 回复 3 HP。`);
+      this.healPlayer(2);
+      this.log(`生命汲取触发：击杀 ${name} 回复 2 HP。`);
     }
     this.destroyUnitHud(enemy);
     this.destroyEnemyVisualOverlay(enemy);
