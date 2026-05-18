@@ -41,7 +41,8 @@ export const GamePage = () => {
           <span>J 普通攻击</span>
           <span>K 冲刺斩，冷却 5 秒</span>
           <span>L 护盾，持续 3 秒，冷却 8 秒</span>
-          <span>E 互动，Esc 暂停，R 重新开始</span>
+          <span>E 互动，I 查看状态</span>
+          <span>Esc 暂停，R 重新开始</span>
         </div>
         <button onClick={() => setGameKey((value) => value + 1)}>重置游戏实例</button>
         {lastRunId && <p className="success">最近结算已保存：{lastRunId}</p>}
