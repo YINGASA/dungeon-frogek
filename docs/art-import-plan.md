@@ -122,6 +122,13 @@ V1.5.3：普通怪 sprite 第一版
 - 攻击前摇和当前 AI 同步。
 - 不改数值。
 
+V1.5.3 当前实现说明：
+
+- 先使用 `src/game/assets/enemyVisualThemes.ts` 和 generated fallback 提升普通怪可读性。
+- 当前不新增真实怪物 sprite sheet，不下载资源，不安装依赖。
+- 攻击前摇、受击、死亡、精英光环和血条优化只做表现层，不改变 AI、HP、ATK、速度、攻击频率、碰撞或奖励逻辑。
+- 后续正式怪物 sprite sheet 导入时，应保留当前 generated fallback，并让动画跟随现有 AI 事件，而不是驱动战斗逻辑。
+
 V1.5.4：角色与武器动画第一版
 
 - 接入遗迹猎人 idle / walk。

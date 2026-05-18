@@ -33,6 +33,25 @@ Future tileset replacement should keep the same fallback contract:
 3. Keep generated Graphics fallback available when assets are missing, disabled, or still being evaluated.
 4. Do not let tile art alter collision, pathing, door placement, room routing, reward timing, enemy spawning, or combat hitboxes.
 
+## V1.5.3 Enemy Visual Pass
+
+V1.5.3 improves first-floor monster readability through generated enemy visual themes and short-lived Phaser Graphics effects. It does not add real monster sprite sheets, does not load external assets, and does not change enemy AI, stats, attack timing, collision, or combat judgment.
+
+Current runtime behavior:
+
+- `src/game/assets/enemyVisualThemes.ts` defines visual colors, warning colors, hit flashes, death particles, elite aura colors, and fallback shape intent for each common enemy.
+- Crystal slime, skeleton guard, shadow bat, and rune archer fallback textures have stronger silhouettes and clearer identity.
+- Attack windup visuals are drawn on top of the existing timing windows only; they do not delay or accelerate attacks.
+- Hit and death feedback uses brief particles and tweens that destroy themselves.
+- Elite enemies get a stronger aura and more readable health bar styling while keeping their existing stats and spawn rules.
+
+Future monster sprite sheets should keep this fallback contract:
+
+1. Register formal monster sheets in `src/game/assets/artManifest.ts`.
+2. Prefer sprite animation only when the resource exists and is enabled.
+3. Keep generated enemy fallback available when resources are missing or still being evaluated.
+4. Do not let animation frames drive AI state, damage, projectile timing, hitboxes, knockback, wave progression, rewards, or kill counting.
+
 ## Directory Layout
 
 Place future first-floor runtime art under:
