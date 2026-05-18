@@ -214,6 +214,8 @@ const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
     { name: '出生房', kind: 'start', description: '灵墟入口，空气里漂浮着发光的晶尘。', enemies: [] }
   ],
   battle: [
+    { name: '蝠群突袭房', kind: 'battle', description: '成群暗影蝙蝠从破裂穹顶落下，晶化史莱姆拖慢退路。', enemies: ['bat', 'bat', 'slime'] },
+    { name: '骷髅守卫压制房', kind: 'battle', description: '两名骷髅守卫稳稳压住通道，晶化史莱姆从侧面逼近。', enemies: ['skeleton', 'skeleton', 'slime'] },
     { name: '普通战斗房', kind: 'battle', description: '晶化史莱姆与骷髅守卫堵住了通道。', enemies: ['slime', 'skeleton'] },
     { name: '回廊战斗房', kind: 'battle', description: '晶尘回廊里传来黏液与骨甲摩擦的声音。', enemies: ['slime', 'slime', 'skeleton'] },
     { name: '裂隙战斗房', kind: 'battle', description: '暗影蝙蝠从裂隙里俯冲而下。', enemies: ['slime', 'bat'] }
@@ -226,6 +228,8 @@ const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
     { name: '随机事件房', kind: 'event', description: '这里的源晶回声让时间变得迟缓。', enemies: [] }
   ],
   elite: [
+    { name: '符文射手夹击房', kind: 'elite', description: '符文射手占住两侧裂隙，少量近战怪逼迫你先做取舍。', enemies: ['slime', 'skeleton', 'archer'] },
+    { name: '精英护卫房', kind: 'elite', description: '一名源晶强化的护卫守在门前，周围小怪等待你露出破绽。', enemies: ['skeleton', 'bat', 'slime'] },
     { name: '高级战斗房', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'archer', 'skeleton'] },
     { name: '精英战斗房', kind: 'elite', description: '精英守卫封锁了路口，空气里压着危险的源晶波动。', enemies: ['skeleton', 'archer', 'bat'] }
   ],
@@ -2495,7 +2499,18 @@ export class DungeonScene extends Phaser.Scene {
 
   private buildCombatWaves(): CombatWave[] {
     const depth = this.getDepthRatio();
+    const roomName = this.currentRoom.name;
     if (this.currentRoom.kind === 'battle') {
+      if (roomName.includes('蝠群突袭')) {
+        return depth < 0.5
+          ? [['bat', 'bat'], ['slime']]
+          : [['bat', 'slime'], ['bat', 'bat']];
+      }
+      if (roomName.includes('骷髅守卫压制')) {
+        return depth < 0.55
+          ? [['skeleton', 'slime'], ['skeleton']]
+          : [['slime', 'skeleton'], ['skeleton', 'slime']];
+      }
       const waveCount = depth < 0.42 ? 1 : depth < 0.72 ? Phaser.Math.Between(1, 2) : 2;
       const waves: CombatWave[] = [];
       waves.push(this.currentRoom.enemies.slice(0, Math.max(2, Math.min(3, this.currentRoom.enemies.length))));
@@ -2504,6 +2519,12 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     const trueEliteRoom = this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳');
+    if (roomName.includes('符文射手夹击')) {
+      return [['slime', 'skeleton'], ['archer', Phaser.Math.Between(1, 100) <= 50 ? 'bat' : 'slime']];
+    }
+    if (roomName.includes('精英护卫')) {
+      return [['slime', 'bat'], [{ kind: 'skeleton', elite: true }, Phaser.Math.Between(1, 100) <= 55 ? 'slime' : 'bat']];
+    }
     const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 30 ? 3 : 2;
     const waves: CombatWave[] = [];
     waves.push(this.pickEnemyMix(depth, trueEliteRoom ? 3 : 2));
