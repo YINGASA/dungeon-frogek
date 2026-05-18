@@ -859,6 +859,8 @@ export class DungeonScene extends Phaser.Scene {
   private branchDoorLabels: Phaser.GameObjects.GameObject[] = [];
   private branchDoorTweens: Phaser.Tweens.Tween[] = [];
   private shieldRing?: Phaser.GameObjects.Arc;
+  private lowHpVignette?: Phaser.GameObjects.Graphics;
+  private lowHpWarningActive = false;
   private playerWeaponVisual?: Phaser.GameObjects.Graphics;
   private bossBarBg?: Phaser.GameObjects.Rectangle;
   private bossBarFill?: Phaser.GameObjects.Rectangle;
@@ -994,6 +996,7 @@ export class DungeonScene extends Phaser.Scene {
     this.skillText = this.add.text(18, 458, '', { fontFamily: 'monospace', fontSize: '15px', color: '#aefcff', lineSpacing: 7 }).setDepth(80);
     this.roomText = this.add.text(690, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#8fffe6', align: 'right', wordWrap: { width: 250 } }).setDepth(80);
     this.logText = this.add.text(18, 552, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ffe6ad', wordWrap: { width: 900 } }).setDepth(80);
+    this.createLowHpVignette();
     this.setGameplayUiVisible(false);
     this.player.setVisible(false);
     this.showTitleScreen();
@@ -1004,6 +1007,7 @@ export class DungeonScene extends Phaser.Scene {
     this.skillText?.setVisible(visible);
     this.roomText?.setVisible(visible);
     this.logText?.setVisible(visible);
+    this.lowHpVignette?.setVisible(visible && this.lowHpWarningActive);
   }
 
   private showTitleScreen() {
@@ -1063,6 +1067,36 @@ export class DungeonScene extends Phaser.Scene {
     rect.on('pointerdown', onClick);
     button.add([rect, text]);
     return button;
+  }
+
+  private createLowHpVignette() {
+    this.lowHpVignette?.destroy();
+    const g = this.add.graphics().setDepth(79).setVisible(false);
+    g.fillStyle(0x7b1024, 0.58);
+    g.fillRect(0, 0, 960, 18);
+    g.fillRect(0, 582, 960, 18);
+    g.fillRect(0, 0, 18, 600);
+    g.fillRect(942, 0, 18, 600);
+    g.fillStyle(0x7b1024, 0.22);
+    g.fillRect(18, 18, 924, 14);
+    g.fillRect(18, 568, 924, 14);
+    g.fillRect(18, 18, 14, 564);
+    g.fillRect(928, 18, 14, 564);
+    this.lowHpVignette = g;
+  }
+
+  private updateLowHpWarning(time: number) {
+    if (!this.lowHpVignette || !this.player?.stats || this.runEnded) return;
+    const active = this.player.stats.hp / this.player.stats.maxHp <= 0.3;
+    this.lowHpWarningActive = active;
+    this.lowHpVignette.setVisible(active && this.flowState === 'playing');
+    if (!active) {
+      this.hpBarFill.setAlpha(1);
+      return;
+    }
+    const pulse = 0.42 + Math.sin(time / 115) * 0.18;
+    this.lowHpVignette.setAlpha(pulse);
+    this.hpBarFill.setAlpha(0.62 + Math.sin(time / 90) * 0.28);
   }
 
   private startGame() {
@@ -1689,6 +1723,8 @@ export class DungeonScene extends Phaser.Scene {
     this.eventCombatRareRewardChance = 0;
     this.relicState = this.createDefaultRelicState();
     this.epicRewardsTaken = 0;
+    this.lowHpWarningActive = false;
+    this.lowHpVignette?.setVisible(false);
     this.activeRewardChoices = [];
     this.rewardPanel?.destroy();
     this.rewardPanel = undefined;
@@ -2075,6 +2111,34 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.drawRoomThemeSignature(g, theme, innerLeft, innerRight, innerTop, innerBottom);
+    if (bossRoom) this.drawBossDomainFloorArt(g, theme, innerLeft, innerRight, innerTop, innerBottom);
+  }
+
+  private drawBossDomainFloorArt(g: Phaser.GameObjects.Graphics, theme: RoomVisualTheme, left: number, right: number, top: number, bottom: number) {
+    const cx = 480;
+    const cy = 320;
+    g.fillStyle(0x07030d, 0.16).fillCircle(cx, cy, 176);
+    g.lineStyle(3, theme.runeColor, 0.5).strokeCircle(cx, cy, 150);
+    g.lineStyle(1, theme.glowColor, 0.34).strokeCircle(cx, cy, 116);
+    g.lineStyle(2, theme.accentColor, 0.28).strokeCircle(cx, cy, 190);
+    for (let i = 0; i < 12; i += 1) {
+      const angle = (Math.PI * 2 * i) / 12;
+      const inner = 124 + (i % 2) * 18;
+      const outer = 174;
+      g.lineStyle(i % 3 === 0 ? 3 : 2, i % 2 ? theme.crackColor : theme.runeColor, 0.32);
+      g.lineBetween(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner, cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+      g.fillStyle(i % 2 ? theme.glowColor : theme.accentColor, 0.18);
+      g.fillCircle(cx + Math.cos(angle) * 144, cy + Math.sin(angle) * 144, i % 3 === 0 ? 5 : 3);
+    }
+    const cracks = [
+      [left + 48, top + 52, cx - 68, cy - 38, right - 72, bottom - 82],
+      [right - 80, top + 42, cx + 44, cy + 10, left + 96, bottom - 48],
+      [cx - 180, cy + 84, cx - 42, cy + 32, cx + 190, cy + 106]
+    ];
+    cracks.forEach(([x1, y1, x2, y2, x3, y3]) => {
+      g.lineStyle(3, theme.crackColor, 0.58).lineBetween(x1, y1, x2, y2);
+      g.lineStyle(2, theme.glowColor, 0.22).lineBetween(x2, y2, x3, y3);
+    });
   }
 
   private drawRoomThemeSignature(g: Phaser.GameObjects.Graphics, theme: RoomVisualTheme, left: number, right: number, top: number, bottom: number) {
@@ -2138,6 +2202,18 @@ export class DungeonScene extends Phaser.Scene {
     g.lineStyle(2, theme.wallInnerColor, bossRoom ? 0.72 : 0.52).strokeRect(left + 15, top + 15, right - left - 30, bottom - top - 30);
     g.lineStyle(3, theme.accentColor, bossRoom ? 0.78 : 0.56).strokeRoundedRect(right - 28, 320 - 58, 52, 116, 8);
     g.fillStyle(theme.glowColor, this.roomCleared ? 0.08 : 0.04).fillRoundedRect(right - 30, 320 - 60, 56, 120, 8);
+    if (bossRoom) {
+      g.lineStyle(2, theme.runeColor, 0.42).strokeRect(left + 34, top + 34, right - left - 68, bottom - top - 68);
+      g.lineStyle(1, theme.glowColor, 0.26).strokeRect(left + 50, top + 50, right - left - 100, bottom - top - 100);
+      [left + 42, right - 42].forEach((x) => {
+        [top + 42, bottom - 42].forEach((y) => {
+          g.fillStyle(theme.accentColor, 0.18).fillCircle(x, y, 20);
+          g.lineStyle(2, theme.glowColor, 0.56).strokeCircle(x, y, 22);
+          g.lineStyle(1, theme.runeColor, 0.36).lineBetween(x - 14, y, x + 14, y);
+          g.lineBetween(x, y - 14, x, y + 14);
+        });
+      });
+    }
 
     const runeY = [top + 28, bottom - 28];
     runeY.forEach((y, row) => {
@@ -2624,13 +2700,17 @@ export class DungeonScene extends Phaser.Scene {
     this.shieldUntil = time + 3000;
     this.skillUses += 1;
     this.shieldRing?.destroy();
-    this.shieldRing = this.add.circle(this.player.x, this.player.y, 38, 0x6dfcff, 0.12).setStrokeStyle(3, 0x8ffcff, 0.95).setDepth(29);
+    this.shieldRing = this.add.circle(this.player.x, this.player.y, 42, 0x6dfcff, 0.14).setStrokeStyle(4, 0xd8ffff, 0.98).setDepth(29);
     this.tweens.add({ targets: this.shieldRing, scale: 1.18, alpha: 0.58, yoyo: true, repeat: -1, duration: 420 });
+    this.showShieldStartEffect();
     this.player.setTint(0x9ffff0);
     this.time.delayedCall(3000, () => {
       if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
-      this.shieldRing?.destroy();
-      this.shieldRing = undefined;
+      if (this.shieldRing) {
+        const ring = this.shieldRing;
+        this.shieldRing = undefined;
+        this.tweens.add({ targets: ring, alpha: 0, scale: 1.42, duration: 240, onComplete: () => ring.destroy() });
+      }
     });
     this.log('护盾启动：3 秒内受到伤害减少 50%。');
   }
@@ -2657,6 +2737,52 @@ export class DungeonScene extends Phaser.Scene {
     const arc = this.add.arc(center.x, center.y, range * radiusScale, -42, 42, false, color, alpha).setStrokeStyle(strokeWidth, color, 0.9).setDepth(28);
     arc.setRotation(Phaser.Math.Angle.Between(0, 0, this.lastFacing.x, this.lastFacing.y) + Phaser.Math.DegToRad(angleOffset));
     this.tweens.add({ targets: arc, alpha: 0, scale: 1.18, duration, onComplete: () => arc.destroy() });
+  }
+
+  private showShieldStartEffect() {
+    const ring = this.add.circle(this.player.x, this.player.y, 28, 0x8ffcff, 0.18)
+      .setStrokeStyle(3, 0xd8ffff, 0.86)
+      .setDepth(30)
+      .setData('roomObj', true);
+    this.tweens.add({
+      targets: ring,
+      scale: 1.9,
+      alpha: 0,
+      duration: 260,
+      onUpdate: () => ring.setPosition(this.player.x, this.player.y),
+      onComplete: () => ring.destroy()
+    });
+  }
+
+  private showShieldAbsorbEffect(amount: number) {
+    const ring = this.add.circle(this.player.x, this.player.y, 44, 0x8ffcff, 0.22)
+      .setStrokeStyle(5, 0xeaffff, 0.95)
+      .setDepth(31)
+      .setData('roomObj', true);
+    this.tweens.add({
+      targets: ring,
+      scale: 1.32,
+      alpha: 0,
+      duration: 240,
+      onUpdate: () => ring.setPosition(this.player.x, this.player.y),
+      onComplete: () => ring.destroy()
+    });
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI * 2 * i) / 6;
+      const spark = this.add.rectangle(this.player.x, this.player.y, 10, 3, 0xd8ffff, 0.86)
+        .setRotation(angle)
+        .setDepth(32)
+        .setData('roomObj', true);
+      this.tweens.add({
+        targets: spark,
+        x: this.player.x + Math.cos(angle) * 34,
+        y: this.player.y + Math.sin(angle) * 26,
+        alpha: 0,
+        duration: 250,
+        onComplete: () => spark.destroy()
+      });
+    }
+    this.showFloatingText(this.player.x, this.player.y - 58, `Shield -${amount}`, '#8ffcff');
   }
 
   private spawnDashTrail() {
@@ -3215,11 +3341,107 @@ export class DungeonScene extends Phaser.Scene {
     this.startBossShock(enemy, phaseTwo);
   }
 
+  private showBossCastGlow(enemy: Fighter, phaseTwo: boolean, duration: number) {
+    const color = phaseTwo ? 0xff6db8 : 0x8ffcff;
+    const core = this.add.circle(enemy.x, enemy.y - 8, 48, color, 0.16).setStrokeStyle(3, 0xffffff, 0.55).setDepth(25).setData('roomObj', true);
+    this.tweens.add({
+      targets: core,
+      scale: 1.34,
+      alpha: 0,
+      duration,
+      onUpdate: () => core.setPosition(enemy.x, enemy.y - 8),
+      onComplete: () => core.destroy()
+    });
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI * 2 * i) / 6;
+      const rune = this.add.rectangle(enemy.x + Math.cos(angle) * 42, enemy.y - 8 + Math.sin(angle) * 26, 16, 3, color, 0.72)
+        .setRotation(angle)
+        .setDepth(26)
+        .setData('roomObj', true);
+      this.tweens.add({
+        targets: rune,
+        x: enemy.x + Math.cos(angle) * 18,
+        y: enemy.y - 8 + Math.sin(angle) * 12,
+        alpha: 0,
+        duration,
+        onComplete: () => rune.destroy()
+      });
+    }
+  }
+
+  private showBossShockTelegraph(enemy: Fighter, radius: number, phaseTwo: boolean) {
+    const color = phaseTwo ? 0xff8ac6 : 0x9fffff;
+    [0.52, 0.78, 1].forEach((scale, index) => {
+      const ring = this.add.circle(enemy.x, enemy.y, radius * scale, color, 0.04).setStrokeStyle(index === 2 ? 4 : 2, color, index === 2 ? 0.72 : 0.38).setDepth(22).setData('roomObj', true);
+      this.tweens.add({
+        targets: ring,
+        scale: 1.08,
+        alpha: 0,
+        delay: index * 80,
+        duration: 560,
+        onUpdate: () => ring.setPosition(enemy.x, enemy.y),
+        onComplete: () => ring.destroy()
+      });
+    });
+    for (let i = 0; i < 10; i += 1) {
+      const angle = (Math.PI * 2 * i) / 10;
+      const crack = this.add.line(0, 0, enemy.x + Math.cos(angle) * 34, enemy.y + Math.sin(angle) * 34, enemy.x + Math.cos(angle) * radius, enemy.y + Math.sin(angle) * radius, color, 0.48)
+        .setOrigin(0)
+        .setLineWidth(i % 2 ? 2 : 3)
+        .setDepth(21)
+        .setData('roomObj', true);
+      this.tweens.add({ targets: crack, alpha: 0, duration: 620, onComplete: () => crack.destroy() });
+    }
+  }
+
+  private showBossMeleeTelegraph(enemy: Fighter, phaseTwo: boolean) {
+    const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+    const color = phaseTwo ? 0xff9bcf : 0x9fffff;
+    const centerX = enemy.x + Math.cos(angle) * 54;
+    const centerY = enemy.y + Math.sin(angle) * 54;
+    const arc = this.add.arc(centerX, centerY, 58, -50, 50, false, color, 0.1)
+      .setStrokeStyle(5, color, 0.76)
+      .setDepth(22)
+      .setRotation(angle)
+      .setData('roomObj', true);
+    const line = this.add.line(0, 0, enemy.x, enemy.y, enemy.x + Math.cos(angle) * 104, enemy.y + Math.sin(angle) * 104, color, 0.52)
+      .setOrigin(0)
+      .setLineWidth(3)
+      .setDepth(23)
+      .setData('roomObj', true);
+    this.tweens.add({ targets: [arc, line], alpha: 0, scale: 1.1, duration: 520, onComplete: () => { arc.destroy(); line.destroy(); } });
+  }
+
+  private showBossProjectileLine(x: number, y: number, angle: number, phaseTwo: boolean) {
+    const color = phaseTwo ? 0xff9bcf : 0x8ffcff;
+    const line = this.add.line(0, 0, x, y, x + Math.cos(angle) * 250, y + Math.sin(angle) * 250, color, 0.38)
+      .setOrigin(0)
+      .setLineWidth(3)
+      .setDepth(21)
+      .setData('roomObj', true);
+    this.tweens.add({ targets: line, alpha: 0, duration: 240, onComplete: () => line.destroy() });
+  }
+
+  private showBossSpikeLock(x: number, y: number, phaseTwo: boolean) {
+    const color = phaseTwo ? 0xffa1df : 0xff6dff;
+    const lock = this.add.graphics().setDepth(13).setData('roomObj', true);
+    lock.lineStyle(2, color, 0.78);
+    lock.strokeCircle(x, y, phaseTwo ? 48 : 42);
+    lock.lineBetween(x - 32, y, x - 12, y);
+    lock.lineBetween(x + 12, y, x + 32, y);
+    lock.lineBetween(x, y - 32, x, y - 12);
+    lock.lineBetween(x, y + 12, x, y + 32);
+    lock.fillStyle(color, 0.1).fillCircle(x, y, phaseTwo ? 34 : 30);
+    this.tweens.add({ targets: lock, alpha: 0, scale: 1.12, duration: 760, onComplete: () => lock.destroy() });
+  }
+
   private startBossShock(enemy: Fighter, phaseTwo: boolean) {
     enemy.setData('shockCharging', true);
     enemy.setData('nextShock', this.time.now + (phaseTwo ? 4000 : 5000));
     enemy.setData('closeSince', 0);
     const radius = phaseTwo ? 108 : 96;
+    this.showBossCastGlow(enemy, phaseTwo, 620);
+    this.showBossShockTelegraph(enemy, radius, phaseTwo);
     const warning = this.add.circle(enemy.x, enemy.y, radius, phaseTwo ? 0xff3f98 : 0x42cfff, 0.12).setStrokeStyle(4, phaseTwo ? 0xff8ac6 : 0x9fffff, 0.9).setDepth(23);
     this.tweens.add({ targets: warning, scale: 1.1, alpha: 0.3, yoyo: true, repeat: 2, duration: 190 });
     this.log('晶核守卫正在蓄积晶核震荡，快拉开距离！');
@@ -3248,6 +3470,8 @@ export class DungeonScene extends Phaser.Scene {
     enemy.setData('meleeCharging', true);
     enemy.setData('actionVisual', true);
     enemy.setTexture(this.guardianAssetKey(phaseTwo ? 'phase2_melee' : 'melee')).setDisplaySize(118, 132);
+    this.showBossCastGlow(enemy, phaseTwo, 540);
+    this.showBossMeleeTelegraph(enemy, phaseTwo);
     const warning = this.add.circle(this.player.x, this.player.y, 46, 0xff4f7b, 0.16).setStrokeStyle(3, 0xff9cab).setDepth(22);
     this.time.delayedCall(520, () => {
       warning.destroy();
@@ -3302,6 +3526,7 @@ export class DungeonScene extends Phaser.Scene {
       bullet.setData('bossSkill', isBossProjectile);
       this.bullets.add(bullet);
       const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y) + Phaser.Math.DegToRad(offset);
+      if (isBossProjectile) this.showBossProjectileLine(enemy.x, enemy.y, angle, phaseTwo);
       bullet.setRotation(angle);
       if (isRuneProjectile) {
         const theme = this.getEnemyVisualTheme(enemy);
@@ -3395,6 +3620,7 @@ export class DungeonScene extends Phaser.Scene {
     boss.setData('nextSpike', time + (phaseTwo ? 2100 : 3400));
     const x = Phaser.Math.Between(250, 720);
     const y = Phaser.Math.Between(210, 450);
+    this.showBossSpikeLock(x, y, phaseTwo);
     const warning = this.add.circle(x, y, phaseTwo ? 38 : 34, phaseTwo ? 0xff2f85 : 0x9b3cff, phaseTwo ? 0.24 : 0.18).setStrokeStyle(phaseTwo ? 4 : 3, phaseTwo ? 0xffa1df : 0xff6dff).setDepth(12);
     this.time.delayedCall(800, () => {
       warning.destroy();
@@ -3413,29 +3639,33 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private showEnemyHitFeedback(enemy: Fighter, emphasized = false) {
-    if (enemy.stats.boss) return;
     const theme = this.getEnemyVisualTheme(enemy);
-    const particleCount = emphasized ? 5 : 3;
-    const ring = this.add.circle(enemy.x, enemy.y, emphasized ? 20 : 14, theme.hitFlashColor, emphasized ? 0.18 : 0.12)
+    const weapon = this.selectedWeapon ?? DEFAULT_WEAPON;
+    const particleCount = enemy.stats.boss ? emphasized ? 7 : 4 : emphasized ? 5 : 3;
+    const baseRadius = enemy.stats.boss ? 28 : emphasized ? 20 : 14;
+    const sparkColor = emphasized ? weapon.attackColor : theme.hitFlashColor;
+    const ring = this.add.circle(enemy.x, enemy.y, baseRadius, sparkColor, emphasized ? 0.2 : 0.13)
       .setStrokeStyle(emphasized ? 3 : 2, theme.hitFlashColor, emphasized ? 0.86 : 0.68)
       .setDepth(28)
       .setData('roomObj', true);
-    this.tweens.add({ targets: ring, scale: emphasized ? 1.8 : 1.45, alpha: 0, duration: 180, onComplete: () => ring.destroy() });
+    this.tweens.add({ targets: ring, scale: emphasized ? 2 : 1.55, alpha: 0, duration: emphasized ? 220 : 180, onComplete: () => ring.destroy() });
     for (let i = 0; i < particleCount; i += 1) {
       const angle = (Math.PI * 2 * i) / particleCount + this.seededUnit(this.time.now + i * 17) * 0.5;
-      const particle = this.add.rectangle(enemy.x, enemy.y, emphasized ? 8 : 6, 3, emphasized ? theme.glowColor : theme.deathParticleColor, 0.78)
+      const length = weapon.id === 'spear' ? 11 : weapon.id === 'heavy-blade' ? 10 : 8;
+      const particle = this.add.rectangle(enemy.x, enemy.y, emphasized ? length + 2 : length, 3, emphasized ? weapon.attackColor : theme.deathParticleColor, 0.78)
         .setDepth(29)
         .setRotation(angle)
         .setData('roomObj', true);
       this.tweens.add({
         targets: particle,
-        x: enemy.x + Math.cos(angle) * (emphasized ? 24 : 16),
-        y: enemy.y + Math.sin(angle) * (emphasized ? 18 : 12),
+        x: enemy.x + Math.cos(angle) * (enemy.stats.boss ? emphasized ? 34 : 24 : emphasized ? 24 : 16),
+        y: enemy.y + Math.sin(angle) * (enemy.stats.boss ? emphasized ? 26 : 18 : emphasized ? 18 : 12),
         alpha: 0,
         duration: emphasized ? 220 : 170,
         onComplete: () => particle.destroy()
       });
     }
+    if (emphasized) this.cameras.main.shake(enemy.stats.boss ? 90 : 65, enemy.stats.boss ? 0.0035 : 0.0025);
   }
 
   private damageEnemy(enemy: Fighter, rawDamage: number, emphasized = false) {
@@ -3637,6 +3867,7 @@ export class DungeonScene extends Phaser.Scene {
     const minDamage = options.minDamageRatio ? Math.ceil(rawDamage * options.minDamageRatio) : 1;
     const damageBeforeShield = Math.max(reducedDamage, minDamage);
     const damageAfterSkillShield = Math.max(1, Math.round(damageBeforeShield * (shieldActive ? 0.5 : 1)));
+    const skillShieldAbsorb = shieldActive ? Math.max(0, damageBeforeShield - damageAfterSkillShield) : 0;
     const shieldAbsorb = Math.min(this.relicState.temporaryShield, damageAfterSkillShield);
     this.relicState.temporaryShield -= shieldAbsorb;
     const damage = Math.max(0, damageAfterSkillShield - shieldAbsorb);
@@ -3646,6 +3877,7 @@ export class DungeonScene extends Phaser.Scene {
     this.sfx.play('hurt');
     if (damage > 0) this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
     else this.showFloatingText(this.player.x, this.player.y - 34, 'Shield', '#8ffcff');
+    this.showPlayerDamageFeedback(damage, skillShieldAbsorb + shieldAbsorb);
     this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
     this.log(`${reason}造成 ${damage} 点伤害。${shieldActive ? 'L 护盾减免了伤害。' : ''}${shieldAbsorb > 0 ? `临时护盾抵消 ${shieldAbsorb} 点。` : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
@@ -3663,6 +3895,27 @@ export class DungeonScene extends Phaser.Scene {
       duration: 105,
       ease: 'Quad.easeOut'
     });
+  }
+
+  private showPlayerDamageFeedback(damage: number, shieldAbsorb: number) {
+    if (shieldAbsorb > 0) this.showShieldAbsorbEffect(shieldAbsorb);
+    if (damage <= 0) return;
+    const flash = this.add.circle(this.player.x, this.player.y, 30, 0xff4f7b, 0.16)
+      .setStrokeStyle(3, 0xff9cab, 0.72)
+      .setDepth(31)
+      .setData('roomObj', true);
+    this.tweens.add({
+      targets: flash,
+      scale: damage >= 8 ? 1.85 : 1.45,
+      alpha: 0,
+      duration: damage >= 8 ? 260 : 190,
+      onUpdate: () => flash.setPosition(this.player.x, this.player.y),
+      onComplete: () => flash.destroy()
+    });
+    if (damage >= 8) {
+      const overlay = this.add.rectangle(480, 300, 960, 600, 0x7b1024, 0.1).setDepth(77).setData('roomObj', true);
+      this.tweens.add({ targets: overlay, alpha: 0, duration: 180, onComplete: () => overlay.destroy() });
+    }
   }
 
   private updateInvincibleVisual(time: number) {
@@ -4179,6 +4432,7 @@ export class DungeonScene extends Phaser.Scene {
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
+    this.updateLowHpWarning(time);
     const recentRelics = this.relicState.relics.slice(-3).map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
     const statuses = [
       this.poisonRooms > 0 ? `Poison ${this.poisonRooms} room` : '',
@@ -4457,6 +4711,7 @@ export class DungeonScene extends Phaser.Scene {
     this.flowState = 'ended';
     this.playerActionState = 'dead';
     this.sfx.play(victory ? 'victory' : 'defeat');
+    this.showRunEndFlash(victory);
     this.player.setVelocity(0, 0);
     this.enemies.getChildren().forEach((enemy) => (enemy as Fighter).setVelocity(0, 0));
     this.bullets.clear(true, true);
@@ -4555,5 +4810,15 @@ export class DungeonScene extends Phaser.Scene {
       this.returnToTitle();
     }));
     this.onRunEnd(run.id);
+  }
+
+  private showRunEndFlash(victory: boolean) {
+    const color = victory ? 0xeaffff : 0x7b1024;
+    const flash = this.add.rectangle(480, 300, 960, 600, color, victory ? 0.2 : 0.24).setDepth(205);
+    this.tweens.add({ targets: flash, alpha: 0, duration: victory ? 420 : 520, onComplete: () => flash.destroy() });
+    if (!victory && this.player?.active) {
+      this.player.setTint(0xff4f7b);
+      this.tweens.add({ targets: this.player, alpha: 0.36, yoyo: true, repeat: 2, duration: 120 });
+    }
   }
 }
