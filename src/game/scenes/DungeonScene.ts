@@ -137,6 +137,11 @@ interface PlayerRelicState {
   relics: RewardOption[];
   temporaryShield: number;
   damageReductionFromMinions: number;
+  normalKnockbackBonus: number;
+  roomClearHeal: number;
+  roomClearGoldBonus: number;
+  shieldDurationBonusMs: number;
+  shieldAbsorbHeal: number;
   bossRoomHealUsed: boolean;
   dashCooldownRefunded: boolean;
 }
@@ -364,6 +369,14 @@ const ENEMIES: Record<EnemyKind, Omit<Fighter['stats'], 'id' | 'nextAttack'>> = 
 };
 
 const REWARD_POOL: RewardOption[] = [
+  { id: 'suppressor-grip', name: '压制握柄', rarity: 'common', type: '攻击', description: '握柄上的细小源晶棱面让近战攻击更容易把普通怪推出安全距离。', effectText: '近战击退 +8', apply: (scene) => { scene.relicState.normalKnockbackBonus += 8; } },
+  { id: 'dash-whetstone', name: '冲锋磨石', rarity: 'common', type: '攻击', description: '磨石只强化冲刺斩的第一道刃光，收益稳定但不夸张。', effectText: 'K 伤害 +8%', apply: (scene) => { scene.relicState.dashDamageMultiplier += 0.08; } },
+  { id: 'guardian-prism', name: '守护棱镜', rarity: 'rare', type: '生存', description: '棱镜会延长护盾稳定时间，让你多争取一次走位窗口。', effectText: 'L 护盾持续 +0.5s', apply: (scene) => { scene.relicState.shieldDurationBonusMs += 500; } },
+  { id: 'still-shield-loop', name: '静盾回流', rarity: 'epic', type: '生存', description: '护盾吸收伤害时会回流少量生命，适合稳健防守。', effectText: '护盾吸收后回复 2 HP', apply: (scene) => { scene.relicState.shieldAbsorbHeal += 2; } },
+  { id: 'ember-bandage', name: '余烬绷带', rarity: 'common', type: '回复', description: '清理战斗后，绷带会借余温封住轻伤。', effectText: '战斗清房 HP +2', apply: (scene) => { scene.relicState.roomClearHeal += 2; } },
+  { id: 'battlefield-suture', name: '战场缝线', rarity: 'rare', type: '回复', description: '每次战斗结束后快速处理伤口，回复量不高但很稳定。', effectText: '战斗清房 HP +4', apply: (scene) => { scene.relicState.roomClearHeal += 4; } },
+  { id: 'coin-sigil', name: '拾金符印', rarity: 'common', type: '技能', description: '符印会在战斗房清理后吸附散落金币。', effectText: '战斗清房金币 +3', apply: (scene) => { scene.relicState.roomClearGoldBonus += 3; } },
+  { id: 'route-ledger', name: '路线账册', rarity: 'rare', type: '技能', description: '账册记录清房收益，让每场战斗多带出一点资源。', effectText: '战斗清房金币 +6', apply: (scene) => { scene.relicState.roomClearGoldBonus += 6; } },
   { id: 'sharp-blade', name: '锋利剑刃', rarity: 'common', type: '攻击', description: '剑刃重新开锋，普通攻击与冲刺斩基础伤害提高。', effectText: 'ATK +2', apply: (scene) => { scene.player.stats.atk += 2; } },
   { id: 'attack-crystal', name: '攻击晶石', rarity: 'rare', type: '攻击', description: '源晶强化武器核心，但出现频率较低。', effectText: 'ATK +3', apply: (scene) => { scene.player.stats.atk += 3; } },
   { id: 'armor-rune', name: '破甲符文', rarity: 'rare', type: '攻击', description: '普通攻击和冲刺斩额外造成固定伤害。', effectText: '普攻 / 冲刺斩伤害 +2', apply: (scene) => { scene.relicState.bonusDamage += 2; } },
@@ -401,6 +414,25 @@ const WEAPON_AWARE_RELIC_TEXT: Partial<Record<WeaponId, Record<string, { name: s
   'dual-daggers': {
     'sharp-blade': { name: '双刃开锋', description: '双匕刃口泛起寒光，连击更加致命。' },
     'source-dagger': { name: '源晶双刃', description: '双匕吸附源晶能量，冲刺连斩更加迅捷。' }
+  }
+};
+
+const V1_6_WEAPON_AWARE_RELIC_TEXT: Partial<Record<WeaponId, Record<string, { name: string; description: string }>>> = {
+  'short-sword': {
+    'suppressor-grip': { name: '短剑压制握柄', description: '短剑的握柄更稳，普攻更容易把怪物推离身前。' },
+    'dash-whetstone': { name: '短剑冲锋磨石', description: '短剑刃口被重新打磨，冲刺斩更干净。' }
+  },
+  'heavy-blade': {
+    'suppressor-grip': { name: '重刃压制握柄', description: '重刃握柄加装配重，普攻击退更加可靠。' },
+    'dash-whetstone': { name: '重刃冲锋磨石', description: '重刃的刃面被粗磨开锋，冲刺重斩威力小幅提升。' }
+  },
+  spear: {
+    'suppressor-grip': { name: '长枪压制握柄', description: '枪柄缠上防滑皮带，突刺后更容易稳住距离。' },
+    'dash-whetstone': { name: '长枪冲锋磨石', description: '枪尖重新磨亮，冲刺穿刺的爆发小幅提升。' }
+  },
+  'dual-daggers': {
+    'suppressor-grip': { name: '双匕压制握柄', description: '双匕握柄更贴手，贴身连击时也能推出空隙。' },
+    'dash-whetstone': { name: '双匕冲锋磨石', description: '双匕刃尖变薄，冲刺连斩更利落。' }
   }
 };
 
@@ -1379,6 +1411,11 @@ export class DungeonScene extends Phaser.Scene {
     if (this.relicState.potionHealBonus > 0) buffs.push(`药水回复 +${this.relicState.potionHealBonus}`);
     if (this.relicState.bonusDamage > 0) buffs.push(`普通攻击额外伤害 +${this.relicState.bonusDamage}`);
     if (this.relicState.damageReductionFromMinions > 0) buffs.push(`小怪伤害减免 ${Math.round(this.relicState.damageReductionFromMinions * 100)}%`);
+    if (this.relicState.normalKnockbackBonus > 0) buffs.push(`近战击退 +${this.relicState.normalKnockbackBonus}`);
+    if (this.relicState.roomClearHeal > 0) buffs.push(`战斗清房回复 +${this.relicState.roomClearHeal}`);
+    if (this.relicState.roomClearGoldBonus > 0) buffs.push(`战斗清房金币 +${this.relicState.roomClearGoldBonus}`);
+    if (this.relicState.shieldDurationBonusMs > 0) buffs.push(`护盾持续 +${(this.relicState.shieldDurationBonusMs / 1000).toFixed(1)}s`);
+    if (this.relicState.shieldAbsorbHeal > 0) buffs.push(`护盾吸收后回复 +${this.relicState.shieldAbsorbHeal}`);
     if (this.player.stats.maxHp > this.selectedHero.baseStats.hp) buffs.push(`最大生命提升 +${this.player.stats.maxHp - this.selectedHero.baseStats.hp}`);
     if (this.player.stats.atk > this.selectedHero.baseStats.atk) buffs.push(`攻击提升 +${this.player.stats.atk - this.selectedHero.baseStats.atk}`);
     if (this.player.stats.def + this.rustDefensePenalty > this.selectedHero.baseStats.def) buffs.push(`防御提升 +${this.player.stats.def + this.rustDefensePenalty - this.selectedHero.baseStats.def}`);
@@ -1401,7 +1438,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getRewardDisplayText(reward: RewardOption) {
-    return WEAPON_AWARE_RELIC_TEXT[this.selectedWeapon.id]?.[reward.id];
+    return V1_6_WEAPON_AWARE_RELIC_TEXT[this.selectedWeapon.id]?.[reward.id] ?? WEAPON_AWARE_RELIC_TEXT[this.selectedWeapon.id]?.[reward.id];
   }
 
   public getRewardDisplayName(reward: RewardOption) {
@@ -1788,6 +1825,11 @@ export class DungeonScene extends Phaser.Scene {
       relics: [],
       temporaryShield: 0,
       damageReductionFromMinions: 0,
+      normalKnockbackBonus: 0,
+      roomClearHeal: 0,
+      roomClearGoldBonus: 0,
+      shieldDurationBonusMs: 0,
+      shieldAbsorbHeal: 0,
       bossRoomHealUsed: false,
       dashCooldownRefunded: false
     };
@@ -2831,14 +2873,15 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     this.skillCooldowns.shield = time + this.getShieldCooldownMs();
-    this.shieldUntil = time + 3000;
+    const shieldDurationMs = 3000 + this.relicState.shieldDurationBonusMs;
+    this.shieldUntil = time + shieldDurationMs;
     this.skillUses += 1;
     this.shieldRing?.destroy();
     this.shieldRing = this.add.circle(this.player.x, this.player.y, 42, 0x6dfcff, 0.14).setStrokeStyle(4, 0xd8ffff, 0.98).setDepth(29);
     this.tweens.add({ targets: this.shieldRing, scale: 1.18, alpha: 0.58, yoyo: true, repeat: -1, duration: 420 });
     this.showShieldStartEffect();
     this.player.setTint(0x9ffff0);
-    this.time.delayedCall(3000, () => {
+    this.time.delayedCall(shieldDurationMs, () => {
       if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
       if (this.shieldRing) {
         const ring = this.shieldRing;
@@ -2846,7 +2889,7 @@ export class DungeonScene extends Phaser.Scene {
         this.tweens.add({ targets: ring, alpha: 0, scale: 1.42, duration: 240, onComplete: () => ring.destroy() });
       }
     });
-    this.log('护盾启动：3 秒内受到伤害减少 50%。');
+    this.log(`护盾启动：${(shieldDurationMs / 1000).toFixed(1)} 秒内受到伤害减少 50%。`);
   }
 
   private showWeaponAttackEffect(weapon: WeaponConfig, phase = 1) {
@@ -2998,8 +3041,9 @@ export class DungeonScene extends Phaser.Scene {
   private knockbackEnemy(enemy: Fighter, sourceX: number, sourceY: number, distance: number, stunMs: number) {
     if (!enemy.active || enemy.stats.boss || enemy.getData('dying')) return;
     const eliteControlScale = enemy.getData('elite') ? 0.58 : 1;
+    const bonusDistance = distance + this.relicState.normalKnockbackBonus;
     const angle = Phaser.Math.Angle.Between(sourceX, sourceY, enemy.x, enemy.y);
-    const target = this.getLegalPoint(enemy.x + Math.cos(angle) * distance * eliteControlScale, enemy.y + Math.sin(angle) * distance * eliteControlScale, 22);
+    const target = this.getLegalPoint(enemy.x + Math.cos(angle) * bonusDistance * eliteControlScale, enemy.y + Math.sin(angle) * bonusDistance * eliteControlScale, 22);
     enemy.setData('stunUntil', this.time.now + stunMs * eliteControlScale);
     enemy.setData('attackCharging', false);
     enemy.setVelocity(0, 0);
@@ -4014,6 +4058,10 @@ export class DungeonScene extends Phaser.Scene {
     this.showPlayerDamageFeedback(damage, skillShieldAbsorb + shieldAbsorb);
     this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
     const absorbed = skillShieldAbsorb + shieldAbsorb;
+    if (absorbed > 0 && this.relicState.shieldAbsorbHeal > 0) {
+      const healed = this.healPlayer(this.relicState.shieldAbsorbHeal);
+      if (healed > 0) this.log(`静盾回流回复 ${healed} HP。`);
+    }
     this.log(`${reason}造成 ${damage} 点伤害。${absorbed > 0 ? `护盾吸收了 ${absorbed} 点伤害。` : ''}`);
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
     return true;
@@ -4153,11 +4201,16 @@ export class DungeonScene extends Phaser.Scene {
   private grantRoomClearBonus(trigger: RewardTrigger) {
     if (trigger === 'treasure') return;
     const trueElite = trigger === 'elite' && this.currentRoom.name.includes('精英');
-    const gold = trigger === 'battle'
+    const baseGold = trigger === 'battle'
       ? Phaser.Math.Between(7, 14)
       : trueElite ? Phaser.Math.Between(24, 34) : Phaser.Math.Between(16, 22);
+    const gold = baseGold + this.relicState.roomClearGoldBonus;
     this.gold += gold;
     this.showFloatingText(this.player.x, this.player.y - 98, `Gold +${gold}`, '#ffe6ad');
+    if (this.relicState.roomClearHeal > 0) {
+      const healed = this.healPlayer(this.relicState.roomClearHeal);
+      if (healed > 0) this.log(`战斗清理后回复 ${healed} HP。`);
+    }
   }
 
   private rollRewardChoices(trigger: RewardTrigger) {
