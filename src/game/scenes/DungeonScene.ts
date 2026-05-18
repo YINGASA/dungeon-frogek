@@ -1446,11 +1446,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   public getRewardDisplayName(reward: RewardOption) {
-    return this.getRewardDisplayText(reward)?.name ?? reward.name;
+    return (this.getRewardDisplayText(reward)?.name ?? reward.name) || '未知遗物';
   }
 
   private getRewardDisplayDescription(reward: RewardOption) {
-    return this.getRewardDisplayText(reward)?.description ?? reward.description;
+    return (this.getRewardDisplayText(reward)?.description ?? reward.description) || '暂无描述';
   }
 
   private getRecentObtainedText() {
@@ -1804,18 +1804,18 @@ export class DungeonScene extends Phaser.Scene {
 
   private getRoomDisplayName(room: RoomDef = this.currentRoom) {
     if (room.kind === 'treasure') return '封尘宝库';
-    return room.name;
+    return room.name || this.getRoomTypeLabel(room);
   }
 
   private getRoomTypeLabel(room: RoomDef = this.currentRoom) {
     if (room.kind === 'start') return '出生房';
     if (room.kind === 'battle') return '普通战斗房';
-    if (room.kind === 'elite') return room.name.includes('精英') ? '精英战斗房' : '高级战斗房';
+    if (room.kind === 'elite') return room.name?.includes('精英') ? '精英战斗房' : '高级战斗房';
     if (room.kind === 'treasure') return '封尘宝库';
     if (room.kind === 'event') return '事件房';
     if (room.kind === 'boss') return '首领房';
     if (room.kind === 'rest') return '补给房';
-    return room.name;
+    return room.name || '未知房间';
   }
 
   private createDefaultRelicState(): PlayerRelicState {
@@ -4917,7 +4917,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getEliteRoomsVisited() {
-    return this.getVisitedRooms().filter((room) => room.kind === 'elite' && room.name.includes('精英')).length;
+    return this.getVisitedRooms().filter((room) => room.kind === 'elite').length;
   }
 
   private finishRun(victory: boolean, reason: string) {
@@ -4997,7 +4997,7 @@ export class DungeonScene extends Phaser.Scene {
     const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? 'Yes' : 'No';
     panel.add(this.add.text(-310, -160, [
       `结果：${victory ? '胜利' : '失败'}    评级：${grade}    用时：${durationSeconds}s`,
-      `房间：${visitedRooms.length}    击败：${this.kills}    精英房：${this.getEliteRoomsVisited()}    事件：${this.eventStats.triggered}`,
+      `房间：${visitedRooms.length}    击败：${this.kills}    高级/精英房：${this.getEliteRoomsVisited()}    事件：${this.eventStats.triggered}`,
       `伤害承受：${this.damageTaken}    技能使用：${this.skillUses}    奖励选择：${this.rewardChoiceCount}`,
       `武器：${this.selectedWeapon.name}    流派：${this.selectedWeapon.styleSummary}    构筑：${this.getBuildSummary()}`,
       `遗物：${this.relicState.relics.length}    Epic：${hasEpic}    金币：${this.gold}`,
