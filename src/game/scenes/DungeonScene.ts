@@ -631,6 +631,122 @@ const EVENT_PACK: EventPackDef[] = [
     }
   },
   {
+    id: 'cracked-medicine-cauldron',
+    title: '破损药锅',
+    description: '角落里有一口破损药锅，暗绿色药液仍在轻轻冒泡，气味辛辣又温热。',
+    category: 'mixed',
+    rarity: 'common',
+    weight: 6,
+    effectType: 'potion-box',
+    effectText: '回复 14-22 HP，但获得中毒 1 房。',
+    followUpObjective: '药性稳定后，传送门会重新开启。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const healed = scene.healPlayer(Phaser.Math.Between(14, 22) + scene.relicState.potionHealBonus);
+      scene.applyPoison(1);
+      return {
+        log: `你饮下破损药锅里的残液，回复 ${healed} HP，但毒雾也钻进了肺里。`,
+        floatingText: healed > 0 ? `HP +${healed} / 中毒 1 房` : '中毒 1 房',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'sealed-altar',
+    title: '封印祭坛',
+    description: '石台上的封印仍在低声震动，裂纹里渗出细碎的源晶光尘。',
+    category: 'mixed',
+    rarity: 'rare',
+    weight: 4,
+    effectType: 'unstable-crystal',
+    effectText: '受到 8 点伤害，并获得 1 个 common 或 rare 奖励。',
+    followUpObjective: '封印吞下血迹后，通道会重新显现。',
+    roomTags: ['event'],
+    minRoomIndex: 2,
+    applyEffect: (scene) => {
+      scene.applySafeEventDamage(8, '封印祭坛');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 28 ? 'rare' : 'common', []);
+      if (reward) scene.grantReward(reward);
+      return {
+        log: reward ? `封印祭坛抽走了少量生命，并吐出一缕可用力量：${scene.getRewardDisplayName(reward)}。` : '封印祭坛抽走了少量生命，但回声很快散尽。',
+        floatingText: reward ? `-8 HP / ${scene.getRewardDisplayName(reward)}` : '-8 HP',
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'fallen-explorer-pack',
+    title: '尸骸搜刮',
+    description: '一具旧探险者的尸骸靠在墙边，背包还没有完全腐烂，锁扣上沾着新鲜抓痕。',
+    category: 'mixed',
+    rarity: 'common',
+    weight: 6,
+    effectType: 'ambush',
+    effectText: '大多时候获得 12-24 金币，少数时候触发伏击。',
+    followUpObjective: '搜刮完成，或击退被惊动的怪物。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      if (Phaser.Math.Between(1, 100) <= 28) {
+        return {
+          log: '你刚解开旧背包，墙缝里的怪物就被金属碰撞声惊醒。',
+          floatingText: '搜刮惊动伏击',
+          enemies: ['bat', 'slime'],
+          goldReward: 8,
+          opensPortal: false
+        };
+      }
+      const gold = Phaser.Math.Between(12, 24);
+      scene.gold += gold;
+      return {
+        log: `你从旧背包里翻出还能使用的金币，获得 ${gold} 金币。`,
+        floatingText: `金币 +${gold}`,
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'rift-whispers',
+    title: '裂隙低语',
+    description: '墙缝中传来低语，像是在许诺力量，又像是在记住你的名字。',
+    category: 'mixed',
+    rarity: 'rare',
+    weight: 4,
+    effectType: 'gold',
+    effectText: '损失 6 HP，获得 18-30 金币。',
+    followUpObjective: '低语退去后，继续深入地牢。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const gold = Phaser.Math.Between(18, 30);
+      scene.applySafeEventDamage(6, '裂隙低语');
+      scene.gold += gold;
+      return {
+        log: `裂隙低语灼伤了你的意志，但留下 ${gold} 枚带着余温的金币。`,
+        floatingText: `-6 HP / 金币 +${gold}`,
+        opensPortal: true
+      };
+    }
+  },
+  {
+    id: 'dying-campfire',
+    title: '熄灭的营火',
+    description: '一堆快要熄灭的营火仍残留着一点温度，灰烬旁刻着匆忙留下的安全记号。',
+    category: 'supply',
+    rarity: 'common',
+    weight: 5,
+    effectType: 'heal',
+    effectText: '回复 10-18 HP；若生命已满，仅获得一条安全日志。',
+    followUpObjective: '短暂休整后，传送门会稳定下来。',
+    roomTags: ['event'],
+    applyEffect: (scene) => {
+      const healed = scene.healPlayer(Phaser.Math.Between(10, 18));
+      return {
+        log: healed > 0 ? `你在熄灭的营火旁短暂休整，回复 ${healed} HP。` : '营火只剩余温，但墙上的安全记号让你确认前路暂时稳定。',
+        floatingText: healed > 0 ? `HP +${healed}` : '前路暂时安全',
+        opensPortal: true
+      };
+    }
+  },
+  {
     id: 'purifying-light',
     title: '净化之光',
     description: '一束洁白源光穿过穹顶裂缝，短暂压住了污染回声。',
