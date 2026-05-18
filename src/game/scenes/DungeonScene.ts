@@ -103,6 +103,7 @@ interface RoomDef {
   id: string;
   roomIndex: number;
   name: string;
+  displayName?: string;
   kind: RoomKind;
   description: string;
   enemies: EnemyKind[];
@@ -214,30 +215,30 @@ const ROOM_TEMPLATES: Record<RoomKind, RoomTemplate[]> = {
     { name: '出生房', kind: 'start', description: '灵墟入口，空气里漂浮着发光的晶尘。', enemies: [] }
   ],
   battle: [
-    { name: '蝠群突袭房', kind: 'battle', description: '成群暗影蝙蝠从破裂穹顶落下，晶化史莱姆拖慢退路。', enemies: ['bat', 'bat', 'slime'] },
-    { name: '骷髅守卫压制房', kind: 'battle', description: '两名骷髅守卫稳稳压住通道，晶化史莱姆从侧面逼近。', enemies: ['skeleton', 'skeleton', 'slime'] },
-    { name: '普通战斗房', kind: 'battle', description: '晶化史莱姆与骷髅守卫堵住了通道。', enemies: ['slime', 'skeleton'] },
-    { name: '回廊战斗房', kind: 'battle', description: '晶尘回廊里传来黏液与骨甲摩擦的声音。', enemies: ['slime', 'slime', 'skeleton'] },
-    { name: '裂隙战斗房', kind: 'battle', description: '暗影蝙蝠从裂隙里俯冲而下。', enemies: ['slime', 'bat'] }
+    { name: '蝠群突袭房', displayName: '暗翼巢穴', kind: 'battle', description: '成群暗影蝙蝠从破裂穹顶落下，晶化史莱姆拖慢退路。', enemies: ['bat', 'bat', 'slime'] },
+    { name: '骷髅守卫压制房', displayName: '锈刃回廊', kind: 'battle', description: '两名骷髅守卫稳稳压住通道，晶化史莱姆从侧面逼近。', enemies: ['skeleton', 'skeleton', 'slime'] },
+    { name: '普通战斗房', displayName: '遗迹战室', kind: 'battle', description: '晶化史莱姆与骷髅守卫堵住了通道。', enemies: ['slime', 'skeleton'] },
+    { name: '回廊战斗房', displayName: '晶尘回廊', kind: 'battle', description: '晶尘回廊里传来黏液与骨甲摩擦的声音。', enemies: ['slime', 'slime', 'skeleton'] },
+    { name: '裂隙战斗房', displayName: '裂隙前厅', kind: 'battle', description: '暗影蝙蝠从裂隙里俯冲而下。', enemies: ['slime', 'bat'] }
   ],
   treasure: [
     { name: '封尘宝库', kind: 'treasure', description: '一座封尘石台上摆着仍在发亮的古旧宝箱。', enemies: [], reward: 'chest' },
     { name: '封尘宝库', kind: 'treasure', description: '尘封宝库里残留着源晶光芒，古旧宝箱静静等待开启。', enemies: [], reward: 'chest' }
   ],
   event: [
-    { name: '随机事件房', kind: 'event', description: '这里的源晶回声让时间变得迟缓。', enemies: [] }
+    { name: '随机事件房', displayName: '异象祭坛', kind: 'event', description: '这里的源晶回声让时间变得迟缓。', enemies: [] }
   ],
   elite: [
-    { name: '符文射手夹击房', kind: 'elite', description: '符文射手占住两侧裂隙，少量近战怪逼迫你先做取舍。', enemies: ['slime', 'skeleton', 'archer'] },
-    { name: '精英护卫房', kind: 'elite', description: '一名源晶强化的护卫守在门前，周围小怪等待你露出破绽。', enemies: ['skeleton', 'bat', 'slime'] },
-    { name: '高级战斗房', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'archer', 'skeleton'] },
-    { name: '精英战斗房', kind: 'elite', description: '精英守卫封锁了路口，空气里压着危险的源晶波动。', enemies: ['skeleton', 'archer', 'bat'] }
+    { name: '符文射手夹击房', displayName: '符文哨厅', kind: 'elite', description: '符文射手占住两侧裂隙，少量近战怪逼迫你先做取舍。', enemies: ['slime', 'skeleton', 'archer'] },
+    { name: '精英护卫房', displayName: '封印禁室', kind: 'elite', description: '一名源晶强化的护卫守在门前，周围小怪等待你露出破绽。', enemies: ['skeleton', 'bat', 'slime'] },
+    { name: '高级战斗房', displayName: '裂隙战厅', kind: 'elite', description: '暗影蝙蝠盘旋，符文射手正在蓄能。', enemies: ['bat', 'archer', 'skeleton'] },
+    { name: '精英战斗房', displayName: '禁卫战厅', kind: 'elite', description: '精英守卫封锁了路口，空气里压着危险的源晶波动。', enemies: ['skeleton', 'archer', 'bat'] }
   ],
   rest: [
     { name: '补给房', kind: 'rest', description: '石台上的药剂散发着温热光芒。', enemies: [] }
   ],
   boss: [
-    { name: '首领房', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
+    { name: '首领房', displayName: '源晶核心', kind: 'boss', description: '污染源晶凝聚成晶核守卫。', enemies: ['boss'] }
   ]
 };
 
@@ -1804,16 +1805,22 @@ export class DungeonScene extends Phaser.Scene {
 
   private getRoomDisplayName(room: RoomDef = this.currentRoom) {
     if (room.kind === 'treasure') return '封尘宝库';
-    return room.name || this.getRoomTypeLabel(room);
+    if (room.displayName || room.name) return room.displayName || room.name;
+    if (room.kind === 'battle') return '遗迹战室';
+    if (room.kind === 'elite') return '裂隙战厅';
+    if (room.kind === 'event') return '异象祭坛';
+    if (room.kind === 'boss') return '源晶核心';
+    if (room.kind === 'rest') return '补给房';
+    if (room.kind === 'start') return '出生房';
+    return '未知房间';
   }
 
   private getRoomTypeLabel(room: RoomDef = this.currentRoom) {
     if (room.kind === 'start') return '出生房';
-    if (room.kind === 'battle') return '普通战斗房';
-    if (room.kind === 'elite') return room.name?.includes('精英') ? '精英战斗房' : '高级战斗房';
+    if (room.kind === 'battle' || room.kind === 'elite') return this.getRoomDisplayName(room);
     if (room.kind === 'treasure') return '封尘宝库';
-    if (room.kind === 'event') return '事件房';
-    if (room.kind === 'boss') return '首领房';
+    if (room.kind === 'event') return this.getRoomDisplayName(room);
+    if (room.kind === 'boss') return this.getRoomDisplayName(room);
     if (room.kind === 'rest') return '补给房';
     return room.name || '未知房间';
   }
@@ -2089,8 +2096,8 @@ export class DungeonScene extends Phaser.Scene {
     if (this.currentRoom.kind === 'battle') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 清空敌人后传送门开启。`;
     if (this.currentRoom.kind === 'elite') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 多波敌人会逐步增强。`;
     if (this.currentRoom.kind === 'treasure') return '封尘宝库：打开宝箱后开启传送门。';
-    if (this.currentRoom.kind === 'event') return '事件房：完成事件后开启传送门，结果可能有风险也可能有收益。';
-    if (this.currentRoom.kind === 'boss') return '首领房：击败 Boss 完成本层，注意站桩惩罚和技能预警。';
+    if (this.currentRoom.kind === 'event') return `${this.getRoomDisplayName()}：完成事件后开启传送门，结果可能有风险也可能有收益。`;
+    if (this.currentRoom.kind === 'boss') return `${this.getRoomDisplayName()}：击败 Boss 完成本层，注意站桩惩罚和技能预警。`;
     return `${this.getRoomDisplayName()}：${this.currentRoom.description}`;
   }
 
@@ -2582,8 +2589,8 @@ export class DungeonScene extends Phaser.Scene {
         return;
       }
       this.log(this.currentRoom.kind === 'elite'
-        ? `${this.getRoomTypeLabel()}清除，获得高级奖励。`
-        : '普通战斗房清除，获得战斗奖励。');
+        ? `${this.getRoomDisplayName()}清除，获得高级奖励。`
+        : `${this.getRoomDisplayName()}清除，获得战斗奖励。`);
       this.openRewardChoice(this.currentRoom.kind);
       return;
     }
@@ -4709,7 +4716,7 @@ export class DungeonScene extends Phaser.Scene {
     const roomNumber = this.getDisplayRoomNumber();
     const totalRooms = this.getDisplayTotalRooms();
     const title = this.currentRoom.kind === 'boss'
-      ? `第 ${roomNumber}/${totalRooms} 房：首领房：晶核守卫`
+      ? `第 ${roomNumber}/${totalRooms} 房：${this.getRoomDisplayName()}：晶核守卫`
       : `第 ${roomNumber}/${totalRooms} 房：${this.getRoomDisplayName()}`;
     this.roomTitleToast = this.add.text(480, 300, title, {
       fontFamily: 'monospace',
