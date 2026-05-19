@@ -2521,19 +2521,27 @@ export class DungeonScene extends Phaser.Scene {
     if (this.currentRoom.kind === 'battle') {
       if (roomName.includes('蝠群突袭')) {
         return depth < 0.5
-          ? [['bat', 'slime'], ['bat']]
-          : [['bat', 'slime'], ['bat', 'slime']];
+          ? [['bat', 'bat', 'slime'], ['bat', 'bat', 'bat']]
+          : [['bat', 'bat', 'bat', 'archer'], ['bat', 'bat', 'bat', 'bat', 'bat']];
       }
       if (roomName.includes('骷髅守卫压制')) {
         return depth < 0.55
-          ? [['skeleton', 'slime'], ['skeleton']]
-          : [['slime', 'skeleton'], ['skeleton', 'slime']];
+          ? [['skeleton', 'skeleton', 'slime'], ['skeleton', 'skeleton', 'skeleton']]
+          : [['skeleton', 'skeleton', 'skeleton', 'slime'], ['skeleton', 'skeleton', 'skeleton', 'skeleton', 'skeleton']];
       }
-      const waveCount = depth < 0.42 ? 1 : depth < 0.72 ? Phaser.Math.Between(1, 2) : 2;
-      const waves: CombatWave[] = [];
-      waves.push(this.currentRoom.enemies.slice(0, Math.max(2, Math.min(3, this.currentRoom.enemies.length))));
-      if (waveCount >= 2) waves.push(this.pickEnemyMix(depth, 2 + (depth > 0.75 ? 1 : 0)));
-      return waves;
+      if (roomName.includes('回廊战斗')) {
+        return depth < 0.5
+          ? [['slime', 'slime', 'skeleton'], ['skeleton', 'skeleton', 'slime']]
+          : [['skeleton', 'skeleton', 'slime', 'slime'], ['skeleton', 'skeleton', 'skeleton', 'slime', 'slime']];
+      }
+      if (roomName.includes('裂隙战斗')) {
+        return depth < 0.5
+          ? [['slime', 'slime', 'bat'], ['bat', 'bat', 'slime']]
+          : [['slime', 'slime', 'bat', 'bat'], ['bat', 'bat', 'bat', 'skeleton', 'slime']];
+      }
+      return depth < 0.5
+        ? [['slime', 'skeleton', 'bat'], ['slime', 'slime', 'skeleton']]
+        : [['slime', 'skeleton', 'bat', 'slime'], ['slime', 'skeleton', 'bat', 'skeleton', 'archer']];
     }
 
     const trueEliteRoom = this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳');
