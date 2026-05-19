@@ -1,6 +1,6 @@
 # AI Dungeon Forge
 
-AI Dungeon Forge 是一个面向 AI 游戏岗位校招面试的完整 Web 作品：可玩的 2D Roguelite 地牢、AI 策划工具台、程序化美术 Asset Forge、玩家数据分析与 AI 调优报告。
+AI Dungeon Forge 是一个游戏作品：可玩的 2D Roguelite 地牢、AI 策划工具台、程序化美术 Asset Forge、玩家数据分析与 AI 调优报告。
 
 ## 项目亮点
 
