@@ -116,6 +116,24 @@ interface RoomDef {
 
 type RoomTemplate = Omit<RoomDef, 'id' | 'roomIndex' | 'nextOptions' | 'isCleared' | 'rewardClaimed' | 'eventResolved' | 'selectedBranch'>;
 
+const ROOM_DISPLAY_NAMES: Record<string, string> = {
+  出生房: '地牢入口',
+  普通战斗房: '遗迹战室',
+  回廊战斗房: '旧石回廊',
+  裂隙战斗房: '裂隙战厅',
+  蝠群突袭房: '暗翼巢室',
+  骷髅守卫压制房: '骸骨哨厅',
+  高级战斗房: '深层战厅',
+  符文射手夹击房: '符文箭廊',
+  精英护卫房: '禁卫战厅',
+  精英战斗房: '封印禁室',
+  随机事件房: '异象祭坛',
+  事件房: '异象祭坛',
+  封尘宝库: '封尘宝库',
+  'Boss 房': '源晶核心',
+  首领房: '源晶核心'
+};
+
 interface RewardOption {
   id: string;
   name: string;
@@ -1401,7 +1419,7 @@ export class DungeonScene extends Phaser.Scene {
       `普攻：${this.selectedWeapon.attackVisual}`,
       `K 冲刺：${this.selectedWeapon.dashVisual}`,
       `当前房间：第 ${this.getDisplayRoomNumber()} / ${this.getDisplayTotalRooms()} 房`,
-      `房间类型：${this.getRoomTypeLabel()}`
+      `房间名称：${this.getRoomDisplayName()}`
     ].join('\n');
   }
 
@@ -1803,17 +1821,16 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getRoomDisplayName(room: RoomDef = this.currentRoom) {
-    if (room.kind === 'treasure') return '封尘宝库';
-    return room.name || this.getRoomTypeLabel(room);
+    return ROOM_DISPLAY_NAMES[room.name] ?? this.getRoomKindDisplayName(room);
   }
 
-  private getRoomTypeLabel(room: RoomDef = this.currentRoom) {
-    if (room.kind === 'start') return '出生房';
-    if (room.kind === 'battle') return '普通战斗房';
-    if (room.kind === 'elite') return room.name?.includes('精英') ? '精英战斗房' : '高级战斗房';
+  private getRoomKindDisplayName(room: RoomDef = this.currentRoom) {
+    if (room.kind === 'start') return '地牢入口';
+    if (room.kind === 'battle') return '遗迹战室';
+    if (room.kind === 'elite') return room.name?.includes('精英') ? '封印禁室' : '深层战厅';
     if (room.kind === 'treasure') return '封尘宝库';
-    if (room.kind === 'event') return '事件房';
-    if (room.kind === 'boss') return '首领房';
+    if (room.kind === 'event') return '异象祭坛';
+    if (room.kind === 'boss') return '源晶核心';
     if (room.kind === 'rest') return '补给房';
     return room.name || '未知房间';
   }
@@ -2085,12 +2102,13 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private getRoomEntryLog() {
-    if (this.currentRoom.kind === 'start') return '出生房安全。按 E 进入下一房间。';
-    if (this.currentRoom.kind === 'battle') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 清空敌人后传送门开启。`;
-    if (this.currentRoom.kind === 'elite') return `${this.getRoomTypeLabel()}：${this.currentRoom.description} 多波敌人会逐步增强。`;
-    if (this.currentRoom.kind === 'treasure') return '封尘宝库：打开宝箱后开启传送门。';
-    if (this.currentRoom.kind === 'event') return '事件房：完成事件后开启传送门，结果可能有风险也可能有收益。';
-    if (this.currentRoom.kind === 'boss') return '首领房：击败 Boss 完成本层，注意站桩惩罚和技能预警。';
+    const displayName = this.getRoomDisplayName();
+    if (this.currentRoom.kind === 'start') return `${displayName}安全。按 E 进入下一房间。`;
+    if (this.currentRoom.kind === 'battle') return `${displayName}：${this.currentRoom.description} 清空敌人后传送门开启。`;
+    if (this.currentRoom.kind === 'elite') return `${displayName}：${this.currentRoom.description} 多波敌人会逐步增强。`;
+    if (this.currentRoom.kind === 'treasure') return `${displayName}：打开宝箱后开启传送门。`;
+    if (this.currentRoom.kind === 'event') return `${displayName}：完成事件后开启传送门，结果可能有风险也可能有收益。`;
+    if (this.currentRoom.kind === 'boss') return `${displayName}：击败 Boss 完成本层，注意站桩惩罚和技能预警。`;
     return `${this.getRoomDisplayName()}：${this.currentRoom.description}`;
   }
 
@@ -2582,8 +2600,8 @@ export class DungeonScene extends Phaser.Scene {
         return;
       }
       this.log(this.currentRoom.kind === 'elite'
-        ? `${this.getRoomTypeLabel()}清除，获得高级奖励。`
-        : '普通战斗房清除，获得战斗奖励。');
+        ? `${this.getRoomDisplayName()}清除，获得高级奖励。`
+        : `${this.getRoomDisplayName()}清除，获得战斗奖励。`);
       this.openRewardChoice(this.currentRoom.kind);
       return;
     }
@@ -4666,7 +4684,7 @@ export class DungeonScene extends Phaser.Scene {
     ]);
     this.roomText.setText([
       `第 ${this.getDisplayRoomNumber()}/${this.getDisplayTotalRooms()} 房`,
-      this.getRoomTypeLabel(),
+      this.getRoomDisplayName(),
       this.getWaveHudText(),
       this.getContextHint(),
       this.getNearbyBranchHint(),
@@ -4709,7 +4727,7 @@ export class DungeonScene extends Phaser.Scene {
     const roomNumber = this.getDisplayRoomNumber();
     const totalRooms = this.getDisplayTotalRooms();
     const title = this.currentRoom.kind === 'boss'
-      ? `第 ${roomNumber}/${totalRooms} 房：首领房：晶核守卫`
+      ? `第 ${roomNumber}/${totalRooms} 房：${this.getRoomDisplayName()}：晶核守卫`
       : `第 ${roomNumber}/${totalRooms} 房：${this.getRoomDisplayName()}`;
     this.roomTitleToast = this.add.text(480, 300, title, {
       fontFamily: 'monospace',
