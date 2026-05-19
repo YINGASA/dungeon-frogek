@@ -2519,7 +2519,7 @@ export class DungeonScene extends Phaser.Scene {
     const depth = this.getDepthRatio();
     const roomName = this.currentRoom.name;
     if (this.currentRoom.kind === 'battle') {
-      if (roomName.includes('蝠群突袭')) {
+      if (this.isBatAmbushRoom()) {
         return depth < 0.5
           ? [['bat', 'bat', 'slime'], ['bat', 'bat', 'bat']]
           : [['bat', 'bat', 'bat', 'archer'], ['bat', 'bat', 'bat', 'bat', 'bat']];
@@ -2577,10 +2577,19 @@ export class DungeonScene extends Phaser.Scene {
     return { kind, elite: true };
   }
 
+  private isBatAmbushRoom() {
+    return this.currentRoom.name.includes('蝠群突袭');
+  }
+
   private spawnCurrentWave() {
     const wave = this.combatWaves[this.currentWaveIndex] ?? [];
     if (wave.length === 0) return;
+    const enemiesBeforeSpawn = this.countLivingEnemies();
     this.spawnEnemies(wave);
+    if (this.isBatAmbushRoom() && this.currentWaveIndex > 0) {
+      const spawnedEnemies = Math.max(0, this.countLivingEnemies() - enemiesBeforeSpawn);
+      if (spawnedEnemies < wave.length) this.spawnEnemies(wave.slice(spawnedEnemies));
+    }
     const waveText = `第 ${this.currentWaveIndex + 1} / ${this.combatWaves.length} 波`;
     this.showWaveToast(waveText);
     this.log(this.currentWaveIndex === 0
