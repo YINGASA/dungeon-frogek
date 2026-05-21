@@ -2546,10 +2546,17 @@ export class DungeonScene extends Phaser.Scene {
 
     const trueEliteRoom = this.currentRoom.name.includes('精英') || this.currentRoom.name.includes('绮捐嫳');
     if (roomName.includes('符文射手夹击')) {
-      return [['slime', 'skeleton'], ['archer', Phaser.Math.Between(1, 100) <= 50 ? 'bat' : 'slime']];
+      return depth < 0.55
+        ? [['skeleton', 'slime', 'archer'], ['skeleton', 'bat', 'archer', 'slime']]
+        : [['skeleton', 'slime', 'archer', 'archer'], ['skeleton', 'bat', 'bat', 'archer', 'archer']];
     }
     if (roomName.includes('精英护卫')) {
       return [['slime', 'skeleton'], [{ kind: 'skeleton', elite: true }, Phaser.Math.Between(1, 100) <= 65 ? 'slime' : 'bat']];
+    }
+    if (roomName.includes('高级战斗')) {
+      return depth < 0.55
+        ? [['slime', 'skeleton', 'bat', 'archer'], ['skeleton', 'skeleton', 'bat', 'archer']]
+        : [['skeleton', 'skeleton', 'bat', 'archer'], ['skeleton', 'skeleton', 'archer', 'archer', 'bat']];
     }
     const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 30 ? 3 : 2;
     const waves: CombatWave[] = [];
