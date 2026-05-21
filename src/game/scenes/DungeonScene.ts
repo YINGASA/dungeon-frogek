@@ -932,6 +932,8 @@ const BOSS_SKILL_DAMAGE = {
   }
 } as const;
 
+const SHIELD_CAPACITY = 30;
+
 interface PlayerDamageOptions {
   minDamageRatio?: number;
   invincibleMs?: number;
@@ -1058,6 +1060,7 @@ export class DungeonScene extends Phaser.Scene {
   private rewardTaken = false;
   private runEnded = false;
   private shieldUntil = 0;
+  private shieldRemaining = 0;
   private invincibleUntil = 0;
   private skillCooldowns = { attack: 0, dashSlash: 0, shield: 0 };
   private startedAt = Date.now();
@@ -1408,6 +1411,7 @@ export class DungeonScene extends Phaser.Scene {
   private getStatusBasicLines() {
     return [
       `HP：${Math.max(0, Math.ceil(this.player.stats.hp))} / ${this.player.stats.maxHp}`,
+      `L 护盾：${this.isSkillShieldActive() ? `${this.shieldRemaining} / ${SHIELD_CAPACITY}` : '未激活'}`,
       `ATK：${this.player.stats.atk}`,
       `DEF：${this.player.stats.def}`,
       `金币：${this.gold}`,
@@ -1425,6 +1429,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private getStatusBuffLines() {
     const buffs: string[] = [];
+    if (this.isSkillShieldActive()) buffs.push(`L 护盾容量：${this.shieldRemaining} / ${SHIELD_CAPACITY}`);
     if (this.relicState.temporaryShield > 0) buffs.push(`临时护盾：${this.relicState.temporaryShield}`);
     if (this.relicState.moveSpeedMultiplier !== 1) buffs.push(`移动速度 +${Math.round((this.relicState.moveSpeedMultiplier - 1) * 100)}%`);
     if (this.relicState.dashDamageMultiplier !== 1) buffs.push(`冲刺伤害 +${Math.round((this.relicState.dashDamageMultiplier - 1) * 100)}%`);
@@ -1882,6 +1887,7 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardTaken = false;
     this.runEnded = false;
     this.shieldUntil = 0;
+    this.shieldRemaining = 0;
     this.invincibleUntil = 0;
     this.skillCooldowns = { attack: 0, dashSlash: 0, shield: 0 };
     this.startedAt = Date.now();
@@ -2938,13 +2944,19 @@ export class DungeonScene extends Phaser.Scene {
 
   private activateShield(time: number) {
     if (this.playerActionState === 'dead') return;
+    if (this.isSkillShieldActive(time)) {
+      this.log('护盾已激活，不能重复叠加。');
+      return;
+    }
     if (time < this.skillCooldowns.shield) {
       this.log('护盾还在冷却。');
       return;
     }
     this.skillCooldowns.shield = time + this.getShieldCooldownMs();
     const shieldDurationMs = 3000 + this.relicState.shieldDurationBonusMs;
-    this.shieldUntil = time + shieldDurationMs;
+    const shieldExpiresAt = time + shieldDurationMs;
+    this.shieldUntil = shieldExpiresAt;
+    this.shieldRemaining = SHIELD_CAPACITY;
     this.skillUses += 1;
     this.shieldRing?.destroy();
     this.shieldRing = this.add.circle(this.player.x, this.player.y, 42, 0x6dfcff, 0.14).setStrokeStyle(4, 0xd8ffff, 0.98).setDepth(29);
@@ -2952,14 +2964,27 @@ export class DungeonScene extends Phaser.Scene {
     this.showShieldStartEffect();
     this.player.setTint(0x9ffff0);
     this.time.delayedCall(shieldDurationMs, () => {
-      if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
-      if (this.shieldRing) {
-        const ring = this.shieldRing;
-        this.shieldRing = undefined;
-        this.tweens.add({ targets: ring, alpha: 0, scale: 1.42, duration: 240, onComplete: () => ring.destroy() });
-      }
+      if (this.shieldUntil === shieldExpiresAt && this.shieldRemaining > 0) this.endSkillShield('expired');
     });
-    this.log(`护盾启动：${(shieldDurationMs / 1000).toFixed(1)} 秒内受到伤害减少 50%。`);
+    this.log(`护盾启动：容量 ${this.shieldRemaining}/${SHIELD_CAPACITY}，持续 ${(shieldDurationMs / 1000).toFixed(1)} 秒。`);
+  }
+
+  private isSkillShieldActive(time = this.time.now) {
+    return time < this.shieldUntil && this.shieldRemaining > 0;
+  }
+
+  private endSkillShield(reason: 'broken' | 'expired') {
+    const hadShield = this.shieldRemaining > 0 || this.time.now < this.shieldUntil || Boolean(this.shieldRing);
+    if (!hadShield) return;
+    this.shieldRemaining = 0;
+    this.shieldUntil = 0;
+    if (this.player.active && this.time.now >= this.invincibleUntil) this.player.clearTint();
+    if (this.shieldRing) {
+      const ring = this.shieldRing;
+      this.shieldRing = undefined;
+      this.tweens.add({ targets: ring, alpha: 0, scale: 1.42, duration: 240, onComplete: () => ring.destroy() });
+    }
+    this.log(reason === 'broken' ? '护盾破裂。' : '护盾时间结束，护盾消散。');
   }
 
   private showWeaponAttackEffect(weapon: WeaponConfig, phase = 1) {
@@ -4108,17 +4133,23 @@ export class DungeonScene extends Phaser.Scene {
 
   private damagePlayer(rawDamage: number, reason: string, options: PlayerDamageOptions = {}): boolean {
     if (this.runEnded || this.flowState === 'reward' || !this.player.active || this.time.now < this.invincibleUntil) return false;
-    const shieldActive = this.time.now < this.shieldUntil;
     const minionReduction = options.minionDamage ? this.relicState.damageReductionFromMinions : 0;
     const reducedRawDamage = Math.max(1, Math.round(rawDamage * (1 - minionReduction)));
     const reducedDamage = Math.max(1, reducedRawDamage - this.player.stats.def);
     const minDamage = options.minDamageRatio ? Math.ceil(rawDamage * options.minDamageRatio) : 1;
     const damageBeforeShield = Math.max(reducedDamage, minDamage);
-    const damageAfterSkillShield = Math.max(1, Math.round(damageBeforeShield * (shieldActive ? 0.5 : 1)));
-    const skillShieldAbsorb = shieldActive ? Math.max(0, damageBeforeShield - damageAfterSkillShield) : 0;
-    const shieldAbsorb = Math.min(this.relicState.temporaryShield, damageAfterSkillShield);
+    let remainingDamage = damageBeforeShield;
+    const skillShieldAbsorb = this.isSkillShieldActive()
+      ? Math.min(this.shieldRemaining, remainingDamage)
+      : 0;
+    if (skillShieldAbsorb > 0) {
+      this.shieldRemaining -= skillShieldAbsorb;
+      remainingDamage -= skillShieldAbsorb;
+    }
+    const shieldAbsorb = Math.min(this.relicState.temporaryShield, remainingDamage);
     this.relicState.temporaryShield -= shieldAbsorb;
-    const damage = Math.max(0, damageAfterSkillShield - shieldAbsorb);
+    remainingDamage -= shieldAbsorb;
+    const damage = Math.max(0, remainingDamage);
     this.player.stats.hp -= damage;
     this.damageTaken += damage;
     this.invincibleUntil = this.time.now + (options.invincibleMs ?? 800);
@@ -4132,7 +4163,10 @@ export class DungeonScene extends Phaser.Scene {
       const healed = this.healPlayer(this.relicState.shieldAbsorbHeal);
       if (healed > 0) this.log(`静盾回流回复 ${healed} HP。`);
     }
-    this.log(`${reason}造成 ${damage} 点伤害。${absorbed > 0 ? `护盾吸收了 ${absorbed} 点伤害。` : ''}`);
+    const skillShieldText = skillShieldAbsorb > 0 ? `L 护盾吸收 ${skillShieldAbsorb} 点，剩余 ${this.shieldRemaining}/${SHIELD_CAPACITY}。` : '';
+    const relicShieldText = shieldAbsorb > 0 ? `临时护盾吸收 ${shieldAbsorb} 点。` : '';
+    this.log(`${reason}造成 ${damage} 点伤害。${skillShieldText}${relicShieldText}`);
+    if (skillShieldAbsorb > 0 && this.shieldRemaining <= 0) this.endSkillShield('broken');
     if (this.player.stats.hp <= 0) this.finishRun(false, reason);
     return true;
   }
@@ -4179,11 +4213,11 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     this.player.setAlpha(1);
-    if (time < this.shieldUntil) {
+    if (this.isSkillShieldActive(time)) {
       this.player.setTint(0x9ffff0);
       return;
     }
-    if (time >= this.shieldUntil) this.player.clearTint();
+    if (!this.isSkillShieldActive(time)) this.player.clearTint();
   }
 
   private showDamageNumber(x: number, y: number, damage: number, color: string, emphasized = false) {
@@ -4686,8 +4720,8 @@ export class DungeonScene extends Phaser.Scene {
   private updateUi(time: number) {
     const dashLeft = Math.max(0, Math.ceil((this.skillCooldowns.dashSlash - time) / 1000));
     const shieldLeft = Math.max(0, Math.ceil((this.skillCooldowns.shield - time) / 1000));
-    const shieldActive = time < this.shieldUntil;
-    const shieldStatus = shieldActive ? 'Active' : shieldLeft === 0 ? 'Ready' : `CD ${shieldLeft}s`;
+    const shieldActive = this.isSkillShieldActive(time);
+    const shieldStatus = shieldActive ? `${this.shieldRemaining}/${SHIELD_CAPACITY}` : shieldLeft === 0 ? 'Ready' : `CD ${shieldLeft}s`;
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
@@ -4699,7 +4733,7 @@ export class DungeonScene extends Phaser.Scene {
       this.roomSpeedMultiplier < 1 ? 'Slow' : ''
     ].filter(Boolean).join('  ') || 'Clear';
     this.statusText.setText([
-      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ""}`,
+      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${shieldActive ? `  L Shield ${this.shieldRemaining}/${SHIELD_CAPACITY}` : ""}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ""}`,
       `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
       `Gold ${this.gold}    Relics ${this.relicState.relics.length}`,
       `Weapon ${this.selectedWeapon.name}`,
