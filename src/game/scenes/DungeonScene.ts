@@ -2551,12 +2551,19 @@ export class DungeonScene extends Phaser.Scene {
         : [['skeleton', 'slime', 'archer', 'archer'], ['skeleton', 'bat', 'bat', 'archer', 'archer']];
     }
     if (roomName.includes('精英护卫')) {
-      return [['slime', 'skeleton'], [{ kind: 'skeleton', elite: true }, Phaser.Math.Between(1, 100) <= 65 ? 'slime' : 'bat']];
+      return depth < 0.6
+        ? [['slime', 'bat', { kind: 'skeleton', elite: true }], ['skeleton', 'slime', 'bat', { kind: 'skeleton', elite: true }]]
+        : [['skeleton', 'bat', 'slime', { kind: 'skeleton', elite: true }], ['skeleton', 'bat', 'archer', 'slime', { kind: 'skeleton', elite: true }]];
     }
     if (roomName.includes('高级战斗')) {
       return depth < 0.55
         ? [['slime', 'skeleton', 'bat', 'archer'], ['skeleton', 'skeleton', 'bat', 'archer']]
         : [['skeleton', 'skeleton', 'bat', 'archer'], ['skeleton', 'skeleton', 'archer', 'archer', 'bat']];
+    }
+    if (roomName.includes('精英战斗')) {
+      return depth < 0.6
+        ? [['skeleton', 'bat', 'slime', { kind: 'skeleton', elite: true }], ['skeleton', 'archer', 'bat', { kind: 'bat', elite: true }]]
+        : [['skeleton', 'bat', 'archer', { kind: 'skeleton', elite: true }], ['skeleton', 'archer', 'bat', { kind: 'skeleton', elite: true }, { kind: 'archer', elite: true }]];
     }
     const waveCount = trueEliteRoom ? 2 : depth > 0.72 && Phaser.Math.Between(1, 100) <= 30 ? 3 : 2;
     const waves: CombatWave[] = [];
