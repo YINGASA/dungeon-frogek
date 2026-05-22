@@ -627,13 +627,13 @@ const EVENT_PACK: EventPackDef[] = [
     description: '墙角散着一只旧钱袋，几枚金币还带着微弱温度。',
     category: 'benefit',
     rarity: 'common',
-    weight: 10,
+    weight: 8,
     effectType: 'gold',
-    effectText: '获得 12-24 金币。',
+    effectText: '获得 8-16 金币。',
     followUpObjective: '收起金币后通道开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const gold = Phaser.Math.Between(12, 24);
+      const gold = Phaser.Math.Between(8, 16);
       scene.gold += gold;
       return {
         log: '你发现了遗失的钱袋。',
@@ -648,14 +648,14 @@ const EVENT_PACK: EventPackDef[] = [
     description: '一眼源晶泉水仍未被完全污染，清亮的光晕缓慢荡开。',
     category: 'supply',
     rarity: 'rare',
-    weight: 4,
+    weight: 3,
     effectType: 'heal',
-    effectText: '回复 16-24 HP；低于 35% HP 时额外回复 8 HP。',
+    effectText: '回复 12-18 HP；低于 35% HP 时额外回复 6 HP。',
     followUpObjective: '恢复后继续深入。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const baseHeal = Phaser.Math.Between(16, 24);
-      const lowHpBonus = scene.player.stats.hp / scene.player.stats.maxHp < 0.35 ? 8 : 0;
+      const baseHeal = Phaser.Math.Between(12, 18);
+      const lowHpBonus = scene.player.stats.hp / scene.player.stats.maxHp < 0.35 ? 6 : 0;
       const healed = scene.healPlayer(baseHeal + lowHpBonus);
       return {
         log: '源晶治疗泉恢复了你的生命。',
@@ -672,11 +672,11 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 4,
     effectType: 'potion-box',
-    effectText: '回复 10-15 HP，受药剂遗物加成影响。',
+    effectText: '回复 8-12 HP，受药剂遗物加成影响。',
     followUpObjective: '使用药剂后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const healed = scene.healPlayer(Phaser.Math.Between(10, 15) + scene.relicState.potionHealBonus);
+      const healed = scene.healPlayer(Phaser.Math.Between(8, 12) + scene.relicState.potionHealBonus);
       return {
         log: '你在废弃药剂箱中找到一支还能使用的药剂。',
         floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
@@ -713,17 +713,17 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 10 点伤害，并获得 1 个 common 或 rare 奖励。',
+    effectText: '受到 12 点伤害，并获得 1 个 common 或 rare 奖励；rare 概率较低。',
     followUpObjective: '封印吞下血迹后，通道会重新显现。',
     roomTags: ['event'],
     minRoomIndex: 2,
     applyEffect: (scene) => {
-      scene.applySafeEventDamage(10, '封印祭坛');
-      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 22 ? 'rare' : 'common', []);
+      scene.applySafeEventDamage(12, '封印祭坛');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 16 ? 'rare' : 'common', []);
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `封印祭坛抽走了少量生命，并吐出一缕可用力量：${scene.getRewardDisplayName(reward)}。` : '封印祭坛抽走了少量生命，但回声很快散尽。',
-        floatingText: reward ? `-10 HP / ${scene.getRewardDisplayName(reward)}` : '-10 HP',
+        floatingText: reward ? `-12 HP / ${scene.getRewardDisplayName(reward)}` : '-12 HP',
         opensPortal: true
       };
     }
@@ -736,20 +736,20 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 6,
     effectType: 'ambush',
-    effectText: '大多时候获得 10-20 金币，少数时候触发伏击。',
+    effectText: '大多时候获得 8-16 金币，约三分之一概率触发伏击。',
     followUpObjective: '搜刮完成，或击退被惊动的怪物。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      if (Phaser.Math.Between(1, 100) <= 32) {
+      if (Phaser.Math.Between(1, 100) <= 38) {
         return {
           log: '你刚解开旧背包，墙缝里的怪物就被金属碰撞声惊醒。',
           floatingText: '搜刮惊动伏击',
           enemies: ['bat', 'slime'],
-          goldReward: 6,
+          goldReward: 8,
           opensPortal: false
         };
       }
-      const gold = Phaser.Math.Between(10, 20);
+      const gold = Phaser.Math.Between(8, 16);
       scene.gold += gold;
       return {
         log: `你从旧背包里翻出还能使用的金币，获得 ${gold} 金币。`,
@@ -766,16 +766,16 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'gold',
-    effectText: '损失 8 HP，获得 16-26 金币。',
+    effectText: '损失 10 HP，获得 18-28 金币。',
     followUpObjective: '低语退去后，继续深入地牢。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      const gold = Phaser.Math.Between(16, 26);
-      scene.applySafeEventDamage(8, '裂隙低语');
+      const gold = Phaser.Math.Between(18, 28);
+      scene.applySafeEventDamage(10, '裂隙低语');
       scene.gold += gold;
       return {
         log: `裂隙低语灼伤了你的意志，但留下 ${gold} 枚带着余温的金币。`,
-        floatingText: `-8 HP / 金币 +${gold}`,
+        floatingText: `-10 HP / 金币 +${gold}`,
         opensPortal: true
       };
     }
@@ -808,15 +808,15 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 3,
     effectType: 'cleanse',
-    effectText: '清除中毒或锈蚀；若没有异常状态，获得 8 点临时护盾。',
+    effectText: '清除中毒或锈蚀；若没有异常状态，获得 6 点临时护盾。',
     followUpObjective: '净化完成后通道开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
       const cleansed = scene.cleanseNegativeStatuses();
-      if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 8);
+      if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 6);
       return {
-        log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 8 点临时护盾。',
-        floatingText: cleansed ? '异常状态已清除' : 'Shield 8',
+        log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 6 点临时护盾。',
+        floatingText: cleansed ? '异常状态已清除' : 'Shield 6',
         opensPortal: true
       };
     }
@@ -836,7 +836,7 @@ const EVENT_PACK: EventPackDef[] = [
       log: '你误入怪物伏击，通道被封锁了！',
       floatingText: '怪物伏击',
       enemies: ['slime', 'skeleton'],
-      goldReward: 6,
+      goldReward: 8,
       opensPortal: false
     })
   },
@@ -857,8 +857,8 @@ const EVENT_PACK: EventPackDef[] = [
       log: '精英巡逻队发现了你！',
       floatingText: '精英巡逻',
       enemies: ['skeleton', 'archer'],
-      goldReward: 12,
-      rareRewardChance: 18,
+      goldReward: 10,
+      rareRewardChance: 14,
       opensPortal: false
     })
   },
@@ -870,16 +870,16 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 10 点伤害，并获得随机 common 或 rare 奖励。',
+    effectText: '受到 12 点伤害，并获得随机 common 或 rare 奖励；rare 概率较低。',
     followUpObjective: '吸收残余能量后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
-      scene.applySafeEventDamage(10, '不稳定源晶');
-      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 78 ? 'common' : 'rare', []);
+      scene.applySafeEventDamage(12, '不稳定源晶');
+      const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 84 ? 'common' : 'rare', []);
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${scene.getRewardDisplayName(reward)}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
-        floatingText: reward ? `-10 HP / ${scene.getRewardDisplayName(reward)}` : '-10 HP',
+        floatingText: reward ? `-12 HP / ${scene.getRewardDisplayName(reward)}` : '-12 HP',
         opensPortal: true
       };
     }
