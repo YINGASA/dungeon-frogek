@@ -1,4 +1,4 @@
-import { ArrowRight, BrainCircuit, Gamepad2, ImagePlus, LineChart } from 'lucide-react';
+import { ArrowRight, Gamepad2, LineChart } from 'lucide-react';
 import { TabId } from '../components/Layout';
 import { StatCard } from '../components/StatCard';
 
@@ -6,12 +6,10 @@ export const HomePage = ({ onNavigate }: { onNavigate: (tab: TabId) => void }) =
   <div className="home">
     <section className="hero">
       <div className="hero-copy">
-        <p className="eyebrow">可试玩游戏 + AI 内容生产线</p>
-        <h2>AI 驱动的 Roguelite 地牢游戏与内容生产工具</h2>
-        <p>这不是单个小游戏，而是一条面向 AI 游戏岗位面试的完整链路：AI 生成关卡、程序化生成素材、JSON 驱动试玩、localStorage 记录数据、规则与 AI 共同给出调优报告。</p>
+        <p className="eyebrow">第一关试玩版</p>
+        <h2>灵墟地牢：俯视角动作 Roguelite 地牢探索</h2>
+        <p>当前版本聚焦第一关试玩体验：选择武器，探索随机路线，在普通、高级、精英战斗房中成长，通过事件与遗物构筑角色，最终挑战源晶核心。</p>
         <div className="button-row">
-          <button onClick={() => onNavigate('assets')}><ImagePlus size={18} />生成资源</button>
-          <button onClick={() => onNavigate('designer')}><BrainCircuit size={18} />生成关卡</button>
           <button onClick={() => onNavigate('game')}><Gamepad2 size={18} />开始试玩</button>
         </div>
       </div>
@@ -22,17 +20,19 @@ export const HomePage = ({ onNavigate }: { onNavigate: (tab: TabId) => void }) =
       </div>
     </section>
     <div className="stats-row">
-      <StatCard label="核心展示" value="5 个页面" hint="首页 / 游戏 / 策划台 / 资源工坊 / 数据分析" />
-      <StatCard label="地牢结构" value="3 层" hint="普通、精英、首领" />
-      <StatCard label="AI 兜底" value="Mock 可用" hint="无 API key 也可完整演示" />
-      <StatCard label="数据闭环" value="localStorage" hint="对局、资源、关卡、结算" />
+      <StatCard label="当前版本" value="v1.6.8" hint="线上试玩分支 playable" />
+      <StatCard label="地牢路线" value="6-8 房" hint="普通、高级、精英、事件、Boss" />
+      <StatCard label="武器选择" value="4 种" hint="短剑、重刃、长枪、双匕" />
+      <StatCard label="成长记录" value="localStorage" hint="对局、金币、遗物、结算" />
     </div>
     <section className="feature-grid">
       {[
-        ['可玩 Roguelite', '三职业、技能、装备、遗物、事件、首领三阶段。'],
-        ['AI 策划台', '生成 LevelConfig、怪物、装备、文案、平衡说明，支持 JSON 编辑和三方案对比。'],
-        ['资源工坊', '程序化 SVG 资源包可直接生成和应用，另附 Blender 低模脚本。'],
-        ['数据分析', '读取玩家对局数据，输出胜率、节奏、职业平衡和下一版迭代建议。']
+        ['当前试玩', '第一关完整流程：出生房、战斗房、事件房、Boss 房和结算。'],
+        ['四种武器', '短剑、重刃、长枪、双匕，各自拥有不同攻击节奏和手感。'],
+        ['随机路线', '每局 6-8 个房间，包含普通、高级、精英、事件和 Boss 节点。'],
+        ['战斗成长', '奖励三选一、遗物、金币、清房收益和构筑摘要。'],
+        ['容量护盾', 'L 护盾提供 30 点容量吸收，增加容错但不能无脑站桩。'],
+        ['当前版本', 'v1.6.8：已优化怪物房波次、护盾机制、事件收益，并移除免费宝库自然分支。']
       ].map(([title, body]) => (
         <article className="panel" key={title}>
           <h3>{title}</h3>
@@ -43,7 +43,7 @@ export const HomePage = ({ onNavigate }: { onNavigate: (tab: TabId) => void }) =
     </section>
     <section className="panel">
       <h3><LineChart size={18} /> 推荐演示顺序</h3>
-      <p>资源工坊生成资源包 {'->'} AI 策划台生成三套方案并应用 {'->'} 游戏页选择职业试玩 {'->'} 数据分析页查看数据与调优报告。</p>
+      <p>选择武器 {'->'} 进入地牢 {'->'} 清理战斗房 {'->'} 选择奖励和遗物 {'->'} 处理事件分支 {'->'} 挑战源晶核心。</p>
     </section>
   </div>
 );
