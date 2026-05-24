@@ -1724,11 +1724,10 @@ export class DungeonScene extends Phaser.Scene {
   private generateDungeonRoute() {
     const targetLength = Phaser.Math.Between(6, 8);
     const maxOptionalRooms = targetLength >= 7 ? 2 : 1;
+    // v1.6.8: treasure rooms stay implemented but no longer appear as natural route branches.
     const optionalKinds = Phaser.Utils.Array.Shuffle([
-      ...(Phaser.Math.Between(1, 100) <= 50 ? ['event' as RoomKind] : []),
-      ...(Phaser.Math.Between(1, 100) <= 68 ? ['treasure' as RoomKind] : [])
+      ...(Phaser.Math.Between(1, 100) <= 50 ? ['event' as RoomKind] : [])
     ]).slice(0, maxOptionalRooms);
-    if (optionalKinds.length === 0) optionalKinds.push('treasure');
 
     const middleCount = Math.max(3, targetLength - optionalKinds.length - 2);
     const eliteSlot = Phaser.Math.Between(1, middleCount - 1);
