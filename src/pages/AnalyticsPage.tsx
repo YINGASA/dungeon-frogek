@@ -7,6 +7,24 @@ import { AnalysisReport, GameRun } from '../types/game';
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const avg = (runs: GameRun[], key: keyof GameRun) => runs.length ? runs.reduce((sum, run) => sum + Number(run[key]), 0) / runs.length : 0;
+const victoryReasonPattern = /源晶净化完成|胜利|通关|Boss 击败|boss 击败/i;
+
+const isFailedRun = (run: GameRun) => {
+  const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
+  if (typeof legacyRun.victory === 'boolean') return !legacyRun.victory;
+  if (typeof legacyRun.win === 'boolean') return !legacyRun.win;
+  if (typeof legacyRun.cleared === 'boolean') return !legacyRun.cleared;
+  const result = legacyRun.result?.toLowerCase();
+  if (!result) return false;
+  if (['胜利', 'victory', 'win', 'won', 'cleared', 'clear', '通关'].some((text) => result.includes(text.toLowerCase()))) return false;
+  return ['失败', 'defeat', 'death', 'dead', 'lose', 'lost', 'failed'].some((text) => result.includes(text.toLowerCase()));
+};
+
+const getFailureReason = (run: GameRun) => {
+  const legacyRun = run as GameRun & { deathCause?: string; reason?: string };
+  const reason = legacyRun.deathReason || legacyRun.deathCause || legacyRun.reason || '';
+  return reason && !victoryReasonPattern.test(reason) ? reason : '未知失败原因';
+};
 
 export const AnalyticsPage = () => {
   const [runs, setRuns] = useState<GameRun[]>(storageService.getRuns());
@@ -14,8 +32,12 @@ export const AnalyticsPage = () => {
   const level = useMemo(() => storageService.getLevel(), []);
   const wins = runs.filter((run) => run.victory);
   const winRate = runs.length ? wins.length / runs.length : 0;
-  const death = runs.reduce<Record<string, number>>((map, run) => ({ ...map, [run.deathReason]: (map[run.deathReason] ?? 0) + 1 }), {});
-  const commonDeath = Object.entries(death).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '暂无';
+  const failureRuns = runs.filter(isFailedRun);
+  const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
+    const reason = getFailureReason(run);
+    return { ...map, [reason]: (map[reason] ?? 0) + 1 };
+  }, {});
+  const commonFailureReason = Object.entries(failureReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '暂无失败记录';
   const classRates = ['剑士', '法师', '游侠'].map((name) => {
     const list = runs.filter((run) => run.className === name);
     return `${name}: ${list.length ? pct(list.filter((run) => run.victory).length / list.length) : 'N/A'}`;
@@ -40,7 +62,7 @@ export const AnalyticsPage = () => {
         <StatCard label="平均击杀" value={avg(runs, 'kills').toFixed(1)} />
         <StatCard label="平均金币" value={avg(runs, 'goldEarned').toFixed(1)} />
         <StatCard label="平均遗物" value={avg(runs, 'relicsFound').toFixed(1)} />
-        <StatCard label="常见死亡" value={commonDeath} />
+        <StatCard label="常见失败原因" value={commonFailureReason} />
         <StatCard label="首领剩余" value={`${avg(runs, 'bossRemainingHpPercent').toFixed(1)}%`} />
         <StatCard label="体验评分" value={Math.round(70 + winRate * 15 - Math.max(0, avg(runs, 'bossRemainingHpPercent') - 35) / 3)} />
       </section>
