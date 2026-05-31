@@ -17,7 +17,21 @@ const read = <T>(key: string, fallback: T): T => {
   }
 };
 
-const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+const write = (key: string, value: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage can be unavailable in private browsing or full quota states.
+  }
+};
+
+const remove = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Match write fallback: storage failures should not break the UI.
+  }
+};
 
 export const storageService = {
   getLevel(): LevelConfig {
@@ -48,7 +62,7 @@ export const storageService = {
     write(keys.assets, manifest);
   },
   clearRuns() {
-    localStorage.removeItem(keys.runs);
-    localStorage.removeItem(keys.lastRun);
+    remove(keys.runs);
+    remove(keys.lastRun);
   }
 };
