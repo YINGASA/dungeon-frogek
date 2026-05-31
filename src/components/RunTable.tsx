@@ -1,5 +1,14 @@
 import { GameRun } from '../types/game';
 
+const toFiniteNumber = (value: unknown, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+const formatDuration = (seconds: unknown) => {
+  const duration = Math.max(0, Math.round(toFiniteNumber(seconds)));
+  return `${Math.floor(duration / 60)}m ${duration % 60}s`;
+};
+
 export const RunTable = ({ runs }: { runs: GameRun[] }) => (
   <div className="table-wrap">
     <table>
@@ -16,16 +25,21 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
         </tr>
       </thead>
       <tbody>
+        {!runs.length && (
+          <tr>
+            <td colSpan={8}>暂无对局记录。完成一次试玩结算后会显示最近 10 局。</td>
+          </tr>
+        )}
         {runs.slice(0, 10).map((run) => (
           <tr key={run.id}>
             <td>{run.victory ? '胜利' : '失败'}</td>
-            <td>{run.className}</td>
-            <td>{Math.round(run.durationSeconds / 60)}m {run.durationSeconds % 60}s</td>
-            <td>{run.kills}</td>
-            <td>{run.goldEarned}</td>
-            <td>{run.relicsFound}</td>
-            <td>{run.bossRemainingHpPercent.toFixed(0)}%</td>
-            <td>{run.score}</td>
+            <td>{run.className || '未知'}</td>
+            <td>{formatDuration(run.durationSeconds)}</td>
+            <td>{toFiniteNumber(run.kills)}</td>
+            <td>{toFiniteNumber(run.goldEarned)}</td>
+            <td>{toFiniteNumber(run.relicsFound)}</td>
+            <td>{toFiniteNumber(run.bossRemainingHpPercent).toFixed(0)}%</td>
+            <td>{toFiniteNumber(run.score)}</td>
           </tr>
         ))}
       </tbody>
