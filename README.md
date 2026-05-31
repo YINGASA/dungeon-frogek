@@ -1,13 +1,13 @@
-# AI Dungeon Forge
+# 灵墟地牢
 
-AI Dungeon Forge 是一个游戏作品：可玩的 2D Roguelite 地牢、AI 策划工具台、程序化美术 Asset Forge、玩家数据分析与 AI 调优报告。
+《灵墟地牢》是一个 Vite + React + Phaser 的俯视角动作 Roguelite 网页游戏。当前稳定试玩版聚焦第一关：遗迹猎人选择四种武器之一，探索 6-8 房间随机路线，通过战斗、事件、奖励和遗物成长，最终挑战源晶核心。
 
 ## 项目亮点
 
-- JSON 驱动地牢：AI Designer 生成 `LevelConfig` 后可直接应用到游戏。
-- 可玩 Roguelite：三职业、三层地牢、房间探索、技能、装备、遗物、随机事件、Boss 三阶段。
+- 线上试玩闭环：首页、游戏试玩、数据分析页直接面向当前第一关版本。
+- 可玩 Roguelite：遗迹猎人、四种武器、6-8 房间随机路线、战斗房、事件房、遗物成长和 Boss 战结算。
 - AI 可选接入：有 `OPENAI_API_KEY` 时走 OpenAI；没有 key 时自动使用本地 mock，保证面试现场稳定演示。
-- Asset Forge：后端程序化生成 tileset、角色、怪物、技能、图标 SVG；另附 Blender 低模资产脚本。
+- 内部工具保留：AI Designer 和 Asset Forge 代码仍在项目内，但当前线上试玩导航隐藏入口。
 - 数据闭环：localStorage 保存对局、关卡、资源、结算，Analytics 输出规则诊断与 AI 报告。
 
 ## 技术栈
@@ -126,11 +126,9 @@ blender --background --python scripts/blender/generate_low_poly_assets.py
 
 ## 演示流程
 
-1. 打开 Asset Forge，生成一套主题资源并应用。
-2. 打开 AI Designer，生成关卡，也可以生成 3 个方案进行对比。
-3. 校验 JSON，点击“应用到游戏”。
-4. 进入 Game，选择 Knight / Mage / Ranger 试玩。
-5. 清理房间、触发事件、获得装备和遗物，挑战 Data Demon / 数据魔君。
-6. 胜利或失败后，结算数据自动保存。
-7. 打开 Analytics 查看通关率、平均时长、职业胜率、Boss 剩余血量，并生成分析报告。
+1. 打开首页，确认当前版本、试玩范围和推荐演示顺序。
+2. 进入游戏试玩，选择短剑、重刃、长枪或双匕。
+3. 清理战斗房，选择奖励和遗物，处理事件分支。
+4. 挑战源晶核心，胜利或失败后结算数据自动保存。
+5. 打开数据分析页，查看通关率、平均时长、角色胜率、Boss 剩余血量和最近对局记录。
 
