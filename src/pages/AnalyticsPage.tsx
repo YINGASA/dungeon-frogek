@@ -32,6 +32,7 @@ const getFailureReason = (run: GameRun) => {
   const reason = legacyRun.deathReason || legacyRun.deathCause || legacyRun.reason || '';
   return reason && !victoryReasonPattern.test(reason) ? reason : '未知失败原因';
 };
+const getRunRoleName = (run: GameRun) => run.heroName || run.className || '未知角色';
 
 export const AnalyticsPage = () => {
   const [runs, setRuns] = useState<GameRun[]>(storageService.getRuns());
@@ -48,9 +49,9 @@ export const AnalyticsPage = () => {
     return { ...map, [reason]: (map[reason] ?? 0) + 1 };
   }, {});
   const commonFailureReason = Object.entries(failureReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '暂无失败记录';
-  const classRates = ['剑士', '法师', '游侠'].map((name) => {
-    const list = runs.filter((run) => run.className === name);
-    return `${name}: ${list.length ? pct(list.filter((run) => run.victory).length / list.length) : 'N/A'}`;
+  const roleRates = Array.from(new Set(runs.map(getRunRoleName))).map((name) => {
+    const list = runs.filter((run) => getRunRoleName(run) === name);
+    return `${name}: ${pct(list.filter((run) => run.victory).length / list.length)}`;
   }).join(' / ');
   const rules = hasRuns ? [
     winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
@@ -58,7 +59,7 @@ export const AnalyticsPage = () => {
     avg(runs, 'bossRemainingHpPercent') > 50 && '首领平均剩余血量高于 50%，首领过强。',
     avg(runs, 'durationSeconds') < level.durationMinutes * 60 * 0.5 && '平均游戏时长低于目标时长 50%，关卡过短。',
     avg(runs, 'eventsTriggered') < 0.5 && '事件触发率低，地图路径设计不足。',
-    classRates
+    `角色胜率 ${roleRates}`
   ].filter(Boolean) : ['暂无对局数据。完成一次试玩结算后，这里会显示规则诊断。'];
   const generate = async () => {
     if (!hasRuns) {

@@ -8,6 +8,7 @@ const formatDuration = (seconds: unknown) => {
   const duration = Math.max(0, Math.round(toFiniteNumber(seconds)));
   return `${Math.floor(duration / 60)}m ${duration % 60}s`;
 };
+const getRunRoleName = (run: GameRun) => run.heroName || run.className || '未知角色';
 
 export const RunTable = ({ runs }: { runs: GameRun[] }) => (
   <div className="table-wrap">
@@ -15,7 +16,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
       <thead>
         <tr>
           <th>结果</th>
-          <th>职业</th>
+          <th>角色</th>
           <th>时长</th>
           <th>击杀</th>
           <th>金币</th>
@@ -33,7 +34,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
         {runs.slice(0, 10).map((run) => (
           <tr key={run.id}>
             <td>{run.victory ? '胜利' : '失败'}</td>
-            <td>{run.className || '未知'}</td>
+            <td>{getRunRoleName(run)}</td>
             <td>{formatDuration(run.durationSeconds)}</td>
             <td>{toFiniteNumber(run.kills)}</td>
             <td>{toFiniteNumber(run.goldEarned)}</td>
