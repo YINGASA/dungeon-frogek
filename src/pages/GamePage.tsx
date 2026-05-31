@@ -14,7 +14,7 @@ const relicHunter: PlayerClassConfig = {
   skills: [
     { id: 'attack', name: '普通攻击', key: 'J', cooldown: 350, damageMultiplier: 1, range: 48, description: '近距离攻击' },
     { id: 'dashSlash', name: '冲刺斩', key: 'K', cooldown: 5000, damageMultiplier: 1.8, range: 92, radius: 54, description: '向移动方向冲刺并斩击' },
-    { id: 'shield', name: '护盾', key: 'L', cooldown: 8000, damageMultiplier: 0, range: 0, description: '获得 3 秒护盾' },
+    { id: 'shield', name: '护盾', key: 'L', cooldown: 8000, damageMultiplier: 0, range: 0, description: '获得 30 点容量护盾，最多持续 3 秒' },
     { id: 'unused', name: '未解锁', key: 'I', cooldown: 999999, damageMultiplier: 0, range: 0, description: '后续版本扩展' }
   ]
 };
@@ -40,7 +40,7 @@ export const GamePage = () => {
           <span>WASD / 方向键移动</span>
           <span>J 普通攻击</span>
           <span>K 冲刺斩，冷却 5 秒</span>
-          <span>L 护盾，持续 3 秒，冷却 8 秒</span>
+          <span>L 护盾，30 点容量，最多持续 3 秒，冷却 8 秒</span>
           <span>E 互动，I 查看状态</span>
           <span>Esc 暂停，R 重新开始</span>
         </div>
