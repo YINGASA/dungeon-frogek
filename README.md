@@ -36,7 +36,7 @@ PORT=8787
 
 ## 生成资源
 
-在页面中打开 Asset Forge，输入主题和美术风格，点击“生成资源包”。资源会写入 `public/assets/generated`，Manifest 会保存到 localStorage。
+内部开发时可使用代码中保留的 Asset Forge 入口，输入主题和美术风格后生成资源包。当前线上试玩导航默认隐藏该入口；生成结果会写入 `public/assets/generated`，Manifest 会保存到 localStorage。
 
 也可以运行：
 
