@@ -9,6 +9,15 @@ const formatDuration = (seconds: unknown) => {
   return `${Math.floor(duration / 60)}m ${duration % 60}s`;
 };
 const getRunRoleName = (run: GameRun) => run.heroName || run.className || '未知角色';
+const isVictoryRun = (run: GameRun) => {
+  const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
+  if (typeof legacyRun.victory === 'boolean') return legacyRun.victory;
+  if (typeof legacyRun.win === 'boolean') return legacyRun.win;
+  if (typeof legacyRun.cleared === 'boolean') return legacyRun.cleared;
+  const result = legacyRun.result ?? '';
+  return /源晶净化完成|胜利|通关|Boss 击败|boss 击败|victory|win|won|cleared|clear/i.test(result)
+    && !/失败|defeat|death|dead|lose|lost|failed/i.test(result);
+};
 
 export const RunTable = ({ runs }: { runs: GameRun[] }) => (
   <div className="table-wrap">
@@ -33,7 +42,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
         )}
         {runs.slice(0, 10).map((run) => (
           <tr key={run.id}>
-            <td>{run.victory ? '胜利' : '失败'}</td>
+            <td>{isVictoryRun(run) ? '胜利' : '失败'}</td>
             <td>{getRunRoleName(run)}</td>
             <td>{formatDuration(run.durationSeconds)}</td>
             <td>{toFiniteNumber(run.kills)}</td>

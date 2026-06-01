@@ -14,17 +14,23 @@ const avg = (runs: GameRun[], key: keyof GameRun) => {
   const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 };
-const victoryReasonPattern = /源晶净化完成|胜利|通关|Boss 击败|boss 击败/i;
+const victoryReasonPattern = /源晶净化完成|胜利|通关|Boss 击败|boss 击败|victory|win|won|cleared|clear/i;
+const defeatReasonPattern = /失败|defeat|death|dead|lose|lost|failed/i;
 
+const isVictoryRun = (run: GameRun) => {
+  const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
+  if (typeof legacyRun.victory === 'boolean') return legacyRun.victory;
+  if (typeof legacyRun.win === 'boolean') return legacyRun.win;
+  if (typeof legacyRun.cleared === 'boolean') return legacyRun.cleared;
+  const result = legacyRun.result ?? '';
+  if (!result) return false;
+  return victoryReasonPattern.test(result) && !defeatReasonPattern.test(result);
+};
 const isFailedRun = (run: GameRun) => {
   const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
-  if (typeof legacyRun.victory === 'boolean') return !legacyRun.victory;
-  if (typeof legacyRun.win === 'boolean') return !legacyRun.win;
-  if (typeof legacyRun.cleared === 'boolean') return !legacyRun.cleared;
-  const result = legacyRun.result?.toLowerCase();
-  if (!result) return false;
-  if (['胜利', 'victory', 'win', 'won', 'cleared', 'clear', '通关'].some((text) => result.includes(text.toLowerCase()))) return false;
-  return ['失败', 'defeat', 'death', 'dead', 'lose', 'lost', 'failed'].some((text) => result.includes(text.toLowerCase()));
+  if (typeof legacyRun.victory === 'boolean' || typeof legacyRun.win === 'boolean' || typeof legacyRun.cleared === 'boolean') return !isVictoryRun(run);
+  const result = legacyRun.result ?? '';
+  return defeatReasonPattern.test(result) && !victoryReasonPattern.test(result);
 };
 
 const getFailureReason = (run: GameRun) => {
@@ -41,7 +47,7 @@ export const AnalyticsPage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const level = useMemo(() => storageService.getLevel(), []);
   const hasRuns = runs.length > 0;
-  const wins = runs.filter((run) => run.victory);
+  const wins = runs.filter(isVictoryRun);
   const winRate = runs.length ? wins.length / runs.length : 0;
   const failureRuns = runs.filter(isFailedRun);
   const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
@@ -51,7 +57,7 @@ export const AnalyticsPage = () => {
   const commonFailureReason = Object.entries(failureReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '暂无失败记录';
   const roleRates = Array.from(new Set(runs.map(getRunRoleName))).map((name) => {
     const list = runs.filter((run) => getRunRoleName(run) === name);
-    return `${name}: ${pct(list.filter((run) => run.victory).length / list.length)}`;
+    return `${name}: ${pct(list.filter(isVictoryRun).length / list.length)}`;
   }).join(' / ');
   const rules = hasRuns ? [
     winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
