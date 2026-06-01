@@ -40,7 +40,7 @@ export const AnalyticsPage = () => {
   const wins = runs.filter(isVictoryRun);
   const winRate = runs.length ? wins.length / runs.length : 0;
   const bossRemainingAverage = avgPercent(runs, 'bossRemainingHpPercent');
-  const experienceScore = clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100);
+  const experienceScore = hasRuns ? clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100) : '暂无';
   const failureRuns = runs.filter(isFailedRun);
   const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
     const reason = getFailureReason(run);
