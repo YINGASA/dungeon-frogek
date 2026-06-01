@@ -18,6 +18,7 @@ const read = <T>(key: string, fallback: T): T => {
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isStoredRun = (value: unknown): value is GameRun => isRecord(value) && typeof value.id === 'string';
 
 const write = (key: string, value: unknown) => {
   try {
@@ -51,7 +52,7 @@ export const storageService = {
   },
   getRuns(): GameRun[] {
     const runs = read<unknown>(keys.runs, []);
-    return Array.isArray(runs) ? (runs as GameRun[]) : [];
+    return Array.isArray(runs) ? runs.filter(isStoredRun) : [];
   },
   saveRun(run: GameRun) {
     const runs = [run, ...this.getRuns()].slice(0, 100);
