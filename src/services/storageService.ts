@@ -17,6 +17,8 @@ const read = <T>(key: string, fallback: T): T => {
   }
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
 const write = (key: string, value: unknown) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -35,11 +37,14 @@ const remove = (key: string) => {
 
 export const storageService = {
   getLevel(): LevelConfig {
-    const level = read(keys.level, DEFAULT_LEVEL);
+    const level = read<unknown>(keys.level, DEFAULT_LEVEL);
+    if (!isRecord(level) || typeof level.id !== 'string' || typeof level.name !== 'string') {
+      return DEFAULT_LEVEL;
+    }
     if (level.id === DEFAULT_LEVEL.id || level.name.includes('AI Dungeon Forge') || level.name.includes('Data Demon')) {
       return DEFAULT_LEVEL;
     }
-    return level;
+    return level as unknown as LevelConfig;
   },
   saveLevel(level: LevelConfig) {
     write(keys.level, level);
@@ -54,10 +59,12 @@ export const storageService = {
     write(keys.lastRun, run);
   },
   getLastRun(): GameRun | null {
-    return read<GameRun | null>(keys.lastRun, null);
+    const run = read<unknown>(keys.lastRun, null);
+    return isRecord(run) && typeof run.id === 'string' ? (run as unknown as GameRun) : null;
   },
   getAssetManifest(): AssetManifest | null {
-    return read<AssetManifest | null>(keys.assets, null);
+    const manifest = read<unknown>(keys.assets, null);
+    return isRecord(manifest) && isRecord(manifest.sprites) ? (manifest as unknown as AssetManifest) : null;
   },
   saveAssetManifest(manifest: AssetManifest) {
     write(keys.assets, manifest);
