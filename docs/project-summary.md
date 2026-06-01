@@ -2,7 +2,7 @@
 
 ## 项目背景
 
-AI Dungeon Forge 面向 AI 游戏岗位校招面试，展示一个从内容生成、资源生产、玩法验证到数据调优的完整游戏生产闭环。
+《灵墟地牢》面向 AI 游戏岗位校招面试，展示一个从网页试玩、玩法验证到数据调优的第一关 Roguelite 闭环。当前线上试玩入口聚焦首页、游戏试玩和数据分析；AI Designer 与 Asset Forge 代码仍保留在项目内，但不作为当前公开试玩入口。
 
 ## 目标用户
 
@@ -17,33 +17,32 @@ AI Dungeon Forge 面向 AI 游戏岗位校招面试，展示一个从内容生�
 
 ## 解决方案
 
-- AI 生成关卡配置。
-- 程序化生成美术资源。
-- JSON 驱动游戏。
-- 玩家数据记录。
-- AI 分析调优。
+- 第一关试玩闭环：遗迹猎人、四种武器、6-8 房间随机路线、事件、遗物和 Boss 结算。
+- 数据闭环：GameRun 保存到 localStorage，数据分析页展示通关率、角色胜率、失败原因和最近对局。
+- AI 可选接入：有 API key 时生成分析报告，没有 key 时使用 mock / 规则 fallback。
+- 工具链保留：AI Designer 与 Asset Forge 可继续用于内部开发和后续扩展。
 
 ## 项目流程图
 
 ```mermaid
 flowchart LR
-  A["Designer 输入主题/难度"] --> B["生成 LevelConfig JSON"]
-  C["Asset Forge 输入主题/风格"] --> D["生成 AssetManifest"]
-  B --> E["Phaser Roguelite 试玩"]
-  D --> E
+  A["首页说明试玩范围"] --> B["游戏试玩"]
+  B --> C["选择武器与地牢路线"]
+  C --> D["战斗 / 事件 / 奖励 / 遗物"]
+  D --> E["Boss 结算"]
   E --> F["GameRun 保存到 localStorage"]
-  F --> G["Analytics 规则分析"]
-  G --> H["AI 调优报告"]
-  H --> B
+  F --> G["数据分析页规则诊断"]
+  G --> H["可选 AI 分析报告"]
 ```
 
 ## 核心模块
 
-- Game：三层房间制 Roguelite，包含探索、战斗、事件、装备、遗物、Boss。
-- AI Designer：生成、编辑、校验、导入导出和应用关卡 JSON。
-- Asset Forge：程序化生成可用 SVG 资源，提供 Blender 低模扩展脚本。
-- Analytics：读取对局数据，输出体验评分和调优建议。
+- Home：说明当前第一关试玩范围、版本状态和推荐演示顺序。
+- Game：第一关俯视角动作 Roguelite，包含武器选择、6-8 房间路线、战斗、事件、奖励、遗物和 Boss 结算。
+- Analytics：读取 localStorage 对局数据，输出体验评分、失败原因、角色胜率、最近对局和可选 AI 分析报告。
+- AI Designer：生成、编辑、校验、导入导出和应用关卡 JSON；当前线上试玩隐藏入口。
+- Asset Forge：程序化生成可用 SVG 资源，提供 Blender 低模扩展脚本；当前线上试玩隐藏入口。
 
 ## 后续扩展
 
-接入真实图像生成 API、自动化 Bot 压测、在线关卡分享、更多职业和遗物组合、可视化地图编辑器。
+整理实验分支中稳定的小修补进入正式版本，继续完善结算与数据分析一致性、localStorage 脏数据兜底、试玩流程可读性，再逐步考虑更多职业、遗物组合、自动化 Bot 压测和可视化地图编辑器。
