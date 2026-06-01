@@ -1103,42 +1103,31 @@ export class DungeonScene extends Phaser.Scene {
 
   preload() {
     DUNGEON_ASSETS.forEach((name) => {
-      this.load.image(`dungeon-${name}-png`, `/assets/generated/dungeon/${name}.png`);
       this.load.image(`dungeon-${name}-svg`, `/assets/generated/dungeon/${name}.svg`);
     });
     HUNTER_DIRECTIONS.forEach((direction) => {
-      this.load.image(`hunter-${direction}-png`, `/assets/generated/characters/hunter/hunter_${direction}.png`);
       this.load.image(`hunter-${direction}-svg`, `/assets/generated/characters/hunter/hunter_${direction}.svg`);
       HUNTER_FRAMES.forEach((frame) => {
-        this.load.image(`hunter-${direction}-${frame}-png`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.png`);
         this.load.image(`hunter-${direction}-${frame}-svg`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.svg`);
       });
     });
     SLIME_FRAMES.forEach((frame) => {
-      this.load.image(`slime-${frame}-png`, `/assets/generated/monsters/crystal_slime/slime_${frame}.png`);
       this.load.image(`slime-${frame}-svg`, `/assets/generated/monsters/crystal_slime/slime_${frame}.svg`);
     });
     SKELETON_FRAMES.forEach((frame) => {
-      this.load.image(`skeleton-${frame}-png`, `/assets/generated/monsters/skeleton_guard/skeleton_${frame}.png`);
       this.load.image(`skeleton-${frame}-svg`, `/assets/generated/monsters/skeleton_guard/skeleton_${frame}.svg`);
     });
     BAT_FRAMES.forEach((frame) => {
-      this.load.image(`bat-${frame}-png`, `/assets/generated/monsters/shadow_bat/bat_${frame}.png`);
       this.load.image(`bat-${frame}-svg`, `/assets/generated/monsters/shadow_bat/bat_${frame}.svg`);
     });
     RUNE_ARCHER_FRAMES.forEach((frame) => {
-      this.load.image(`rune-archer-${frame}-png`, `/assets/generated/monsters/rune_archer/rune_archer_${frame}.png`);
       this.load.image(`rune-archer-${frame}-svg`, `/assets/generated/monsters/rune_archer/rune_archer_${frame}.svg`);
     });
-    this.load.image('rune-projectile-png', '/assets/generated/monsters/rune_archer/rune_projectile.png');
     this.load.image('rune-projectile-svg', '/assets/generated/monsters/rune_archer/rune_projectile.svg');
     GUARDIAN_FRAMES.forEach((frame) => {
-      this.load.image(`guardian-${frame}-png`, `/assets/generated/boss/crystal_guardian/guardian_${frame}.png`);
       this.load.image(`guardian-${frame}-svg`, `/assets/generated/boss/crystal_guardian/guardian_${frame}.svg`);
     });
-    this.load.image('guardian-crystal-projectile-png', '/assets/generated/boss/crystal_guardian/crystal_projectile.png');
     this.load.image('guardian-crystal-projectile-svg', '/assets/generated/boss/crystal_guardian/crystal_projectile.svg');
-    this.load.image('guardian-crystal-spike-png', '/assets/generated/boss/crystal_guardian/crystal_spike.png');
     this.load.image('guardian-crystal-spike-svg', '/assets/generated/boss/crystal_guardian/crystal_spike.svg');
     registerConfiguredArtAssets(this);
   }
