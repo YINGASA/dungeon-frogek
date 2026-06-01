@@ -6,6 +6,10 @@ const toFiniteNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 const clampPercent = (value: unknown) => Math.min(100, Math.max(0, toFiniteNumber(value)));
+const formatScore = (value: unknown) => {
+  const score = Number(value);
+  return Number.isFinite(score) ? score : '暂无';
+};
 const formatDuration = (seconds: unknown) => {
   const duration = Math.max(0, Math.round(toFiniteNumber(seconds)));
   return `${Math.floor(duration / 60)}m ${duration % 60}s`;
@@ -41,7 +45,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
             <td>{toFiniteNumber(run.goldEarned)}</td>
             <td>{toFiniteNumber(run.relicsFound)}</td>
             <td>{clampPercent(run.bossRemainingHpPercent).toFixed(0)}%</td>
-            <td>{toFiniteNumber(run.score)}</td>
+            <td>{formatScore(run.score)}</td>
           </tr>
         ))}
       </tbody>
