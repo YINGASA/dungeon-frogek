@@ -11,8 +11,13 @@ const toFiniteNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const avg = (runs: GameRun[], key: keyof GameRun) => {
   const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+};
+const avgPercent = (runs: GameRun[], key: keyof GameRun) => {
+  const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite).map((value) => clamp(value, 0, 100));
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 };
 
@@ -25,6 +30,8 @@ export const AnalyticsPage = () => {
   const hasRuns = runs.length > 0;
   const wins = runs.filter(isVictoryRun);
   const winRate = runs.length ? wins.length / runs.length : 0;
+  const bossRemainingAverage = avgPercent(runs, 'bossRemainingHpPercent');
+  const experienceScore = clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100);
   const failureRuns = runs.filter(isFailedRun);
   const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
     const reason = getFailureReason(run);
@@ -38,7 +45,7 @@ export const AnalyticsPage = () => {
   const rules = hasRuns ? [
     winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
     winRate > 0.8 && '通关率高于 80%，难度不足。',
-    avg(runs, 'bossRemainingHpPercent') > 50 && '首领平均剩余血量高于 50%，首领过强。',
+    bossRemainingAverage > 50 && '首领平均剩余血量高于 50%，首领过强。',
     avg(runs, 'durationSeconds') < level.durationMinutes * 60 * 0.5 && '平均游戏时长低于目标时长 50%，关卡过短。',
     avg(runs, 'eventsTriggered') < 0.5 && '事件触发率低，地图路径设计不足。',
     `角色胜率 ${roleRates}`
@@ -73,8 +80,8 @@ export const AnalyticsPage = () => {
         <StatCard label="平均金币" value={avg(runs, 'goldEarned').toFixed(1)} />
         <StatCard label="平均遗物" value={avg(runs, 'relicsFound').toFixed(1)} />
         <StatCard label="常见失败原因" value={commonFailureReason} />
-        <StatCard label="首领剩余" value={`${avg(runs, 'bossRemainingHpPercent').toFixed(1)}%`} />
-        <StatCard label="体验评分" value={Math.round(70 + winRate * 15 - Math.max(0, avg(runs, 'bossRemainingHpPercent') - 35) / 3)} />
+        <StatCard label="首领剩余" value={`${bossRemainingAverage.toFixed(1)}%`} />
+        <StatCard label="体验评分" value={experienceScore} />
       </section>
       <section className="panel">
         <div className="toolbar-row">
