@@ -18,6 +18,11 @@ button, .file-button {
   gap: 8px;
 }
 button:hover, .file-button:hover { background: #183253; }
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+button:disabled:hover { background: #102137; }
 button.active, button.selected { background: #2bffdf; color: #06101c; }
 .app-shell { min-height: 100vh; background: radial-gradient(circle at 20% 0%, rgba(62,231,201,.16), transparent 35%), #070b14; }
 .topbar {
