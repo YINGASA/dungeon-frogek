@@ -52,7 +52,7 @@ V0.4 的《灵墟地牢》会优先读取 `public/assets/generated/dungeon/` 下
 npm run generate:assets
 ```
 
-该命令会生成基础 Asset Forge 资源，并额外生成 `public/assets/generated/dungeon/*.svg`。游戏运行时会按 `png -> svg -> 内置 Phaser Graphics` 的顺序加载资源；如果资源缺失或生成失败，仍会自动使用内置 fallback 图形，不会影响试玩和通关。
+该命令会生成基础 Asset Forge 资源，并额外生成 `public/assets/generated/dungeon/*.svg`。当前试玩版会预加载这些 generated SVG；如果资源缺失或生成失败，仍会自动使用内置 Phaser Graphics fallback，不会影响试玩和通关。未来正式 PNG 资源应通过资源清单接入，避免请求不存在的文件。
 
 ## 如何生成主角资源
 
@@ -62,7 +62,7 @@ V0.5 的《灵墟地牢》支持四方向遗迹猎人角色图，资源路径为
 npm run generate:hunter
 ```
 
-该命令会生成四方向 idle 图和两帧走路图，例如 `hunter_down.svg`、`hunter_down_1.svg`、`hunter_down_2.svg`。游戏运行时同样优先读取 PNG，其次读取 SVG；如果角色资源不存在，会继续使用内置圆形箭头 fallback。
+该命令会生成四方向 idle 图和两帧走路图，例如 `hunter_down.svg`、`hunter_down_1.svg`、`hunter_down_2.svg`。当前试玩版会预加载这些 generated SVG；如果角色资源不存在，会继续使用内置圆形箭头 fallback。未来正式角色 PNG / sprite sheet 接入前，应先确认资源清单和授权。
 
 ## 如何生成晶化史莱姆资源
 
