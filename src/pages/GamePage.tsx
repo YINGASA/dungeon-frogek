@@ -24,6 +24,10 @@ export const GamePage = ({ onAnalyze }: { onAnalyze: () => void }) => {
   const [lastRunId, setLastRunId] = useState('');
   const level = useMemo(() => ({ ...DEFAULT_LEVEL, name: '灵墟地牢' }), []);
   const onRunEnd = useCallback((runId: string) => setLastRunId(runId), []);
+  const restartGame = useCallback(() => {
+    setLastRunId('');
+    setGameKey((value) => value + 1);
+  }, []);
 
   return (
     <div className="page-grid game-page">
@@ -44,7 +48,7 @@ export const GamePage = ({ onAnalyze }: { onAnalyze: () => void }) => {
           <span>E 互动，I 查看状态</span>
           <span>Esc 暂停，R 重新开始</span>
         </div>
-        <button onClick={() => setGameKey((value) => value + 1)}>重置游戏实例</button>
+        <button onClick={restartGame}>重新开始试玩</button>
         {lastRunId && (
           <div className="control-card">
             <strong>最近结算已保存</strong>
