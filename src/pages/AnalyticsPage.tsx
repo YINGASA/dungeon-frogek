@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { RunTable } from '../components/RunTable';
 import { StatCard } from '../components/StatCard';
 import { apiService } from '../services/apiService';
+import { getFailureReason, getRunRoleName, isFailedRun, isVictoryRun } from '../services/runDisplayService';
 import { storageService } from '../services/storageService';
 import { AnalysisReport, GameRun } from '../types/game';
 
@@ -14,31 +15,6 @@ const avg = (runs: GameRun[], key: keyof GameRun) => {
   const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 };
-const victoryReasonPattern = /源晶净化完成|胜利|通关|Boss 击败|boss 击败|victory|win|won|cleared|clear/i;
-const defeatReasonPattern = /失败|defeat|death|dead|lose|lost|failed/i;
-
-const isVictoryRun = (run: GameRun) => {
-  const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
-  if (typeof legacyRun.victory === 'boolean') return legacyRun.victory;
-  if (typeof legacyRun.win === 'boolean') return legacyRun.win;
-  if (typeof legacyRun.cleared === 'boolean') return legacyRun.cleared;
-  const result = legacyRun.result ?? '';
-  if (!result) return false;
-  return victoryReasonPattern.test(result) && !defeatReasonPattern.test(result);
-};
-const isFailedRun = (run: GameRun) => {
-  const legacyRun = run as GameRun & { result?: string; win?: boolean; cleared?: boolean };
-  if (typeof legacyRun.victory === 'boolean' || typeof legacyRun.win === 'boolean' || typeof legacyRun.cleared === 'boolean') return !isVictoryRun(run);
-  const result = legacyRun.result ?? '';
-  return defeatReasonPattern.test(result) && !victoryReasonPattern.test(result);
-};
-
-const getFailureReason = (run: GameRun) => {
-  const legacyRun = run as GameRun & { deathCause?: string; reason?: string };
-  const reason = legacyRun.deathReason || legacyRun.deathCause || legacyRun.reason || '';
-  return reason && !victoryReasonPattern.test(reason) ? reason : '未知失败原因';
-};
-const getRunRoleName = (run: GameRun) => run.heroName || run.className || '未知角色';
 
 export const AnalyticsPage = () => {
   const [runs, setRuns] = useState<GameRun[]>(storageService.getRuns());
