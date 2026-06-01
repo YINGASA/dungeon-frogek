@@ -45,7 +45,8 @@ export const storageService = {
     write(keys.level, level);
   },
   getRuns(): GameRun[] {
-    return read(keys.runs, []);
+    const runs = read<unknown>(keys.runs, []);
+    return Array.isArray(runs) ? (runs as GameRun[]) : [];
   },
   saveRun(run: GameRun) {
     const runs = [run, ...this.getRuns()].slice(0, 100);
