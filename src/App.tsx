@@ -11,7 +11,7 @@ export default function App() {
   return (
     <Layout active={tab} onTab={setTab}>
       {tab === 'home' && <HomePage onNavigate={setTab} />}
-      {tab === 'game' && <GamePage />}
+      {tab === 'game' && <GamePage onAnalyze={() => setTab('analytics')} />}
       {tab === 'designer' && <DesignerPage onPlay={() => setTab('game')} />}
       {tab === 'assets' && <AssetForgePage />}
       {tab === 'analytics' && <AnalyticsPage />}

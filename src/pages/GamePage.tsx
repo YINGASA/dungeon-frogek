@@ -19,7 +19,7 @@ const relicHunter: PlayerClassConfig = {
   ]
 };
 
-export const GamePage = () => {
+export const GamePage = ({ onAnalyze }: { onAnalyze: () => void }) => {
   const [gameKey, setGameKey] = useState(0);
   const [lastRunId, setLastRunId] = useState('');
   const level = useMemo(() => ({ ...DEFAULT_LEVEL, name: '灵墟地牢' }), []);
@@ -45,7 +45,13 @@ export const GamePage = () => {
           <span>Esc 暂停，R 重新开始</span>
         </div>
         <button onClick={() => setGameKey((value) => value + 1)}>重置游戏实例</button>
-        {lastRunId && <p className="success">最近结算已保存：{lastRunId}</p>}
+        {lastRunId && (
+          <div className="control-card">
+            <strong>最近结算已保存</strong>
+            <span>可在数据分析页查看最近 10 局和规则诊断。</span>
+            <button onClick={onAnalyze}>查看数据分析</button>
+          </div>
+        )}
       </aside>
       <section className="panel game-panel">
         <PhaserGame key={gameKey} level={level} playerClass={relicHunter} onRunEnd={onRunEnd} />
