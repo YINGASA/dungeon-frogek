@@ -20,6 +20,15 @@ const avgPercent = (runs: GameRun[], key: keyof GameRun) => {
   const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite).map((value) => clamp(value, 0, 100));
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 };
+const reportSections: { key: keyof AnalysisReport; title: string }[] = [
+  { key: 'summary', title: '综合摘要' },
+  { key: 'balanceIssues', title: '平衡问题' },
+  { key: 'pacingIssues', title: '节奏问题' },
+  { key: 'classBalanceIssues', title: '角色平衡' },
+  { key: 'artSuggestions', title: '美术建议' },
+  { key: 'operationSuggestions', title: '运营建议' },
+  { key: 'nextIterationPlan', title: '下一步计划' }
+];
 
 export const AnalyticsPage = () => {
   const [runs, setRuns] = useState<GameRun[]>(storageService.getRuns());
@@ -96,12 +105,16 @@ export const AnalyticsPage = () => {
       </section>
       <section className="panel"><h3>最近 10 局</h3><RunTable runs={runs} /></section>
       {report && <section className="preview-grid">
-        {Object.entries(report).map(([key, value]) => (
-          <article className="panel" key={key}>
-            <h3>{key}</h3>
-            {Array.isArray(value) ? value.map((item) => <p key={item}>{item}</p>) : <p>{value}</p>}
-          </article>
-        ))}
+        {reportSections.map(({ key, title }) => {
+          const value = report[key];
+          const items = Array.isArray(value) ? value.filter(Boolean) : [value || '暂无摘要。'];
+          return (
+            <article className="panel" key={key}>
+              <h3>{title}</h3>
+              {items.length ? items.map((item) => <p key={item}>{item}</p>) : <p>暂无建议。</p>}
+            </article>
+          );
+        })}
       </section>}
     </div>
   );
