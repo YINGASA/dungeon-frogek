@@ -78,7 +78,7 @@ export const AnalyticsPage = () => {
       </section>
       <section className="panel">
         <div className="toolbar-row">
-          <h2>Analytics</h2>
+          <h2>数据分析</h2>
           <div className="button-row">
             <button onClick={generate} disabled={isGenerating}>{isGenerating ? '生成中...' : '生成 AI 分析报告'}</button>
             <button onClick={() => { storageService.clearRuns(); setRuns([]); setReport(null); setStatus('对局数据已清空。'); }}>清空数据</button>
