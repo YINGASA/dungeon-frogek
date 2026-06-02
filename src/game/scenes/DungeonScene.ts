@@ -406,7 +406,7 @@ const REWARD_POOL: RewardOption[] = [
 
   { id: 'defense-charm', name: '防御护符', rarity: 'common', type: '生存', description: '稳定的护符让正面承伤更可靠。', effectText: 'DEF +1', apply: (scene) => { scene.player.stats.def += 1; } },
   { id: 'life-crystal', name: '生命结晶', rarity: 'rare', type: '生存', description: '提升最大生命，并立即回复同等生命。', effectText: 'MaxHP +15，回复 15 HP', apply: (scene) => { scene.player.stats.maxHp += 15; scene.player.stats.hp = Math.min(scene.player.stats.maxHp, scene.player.stats.hp + 15); } },
-  { id: 'crystal-shield', name: '晶体护盾', rarity: 'rare', type: '生存', description: '进入新房间时生成一层独立临时护盾。', effectText: '每个新房间获得 Shield 10', apply: () => undefined },
+  { id: 'crystal-shield', name: '晶体护盾', rarity: 'rare', type: '生存', description: '进入新房间时生成一层独立临时护盾。', effectText: '每个新房间获得临时护盾 10', apply: () => undefined },
   { id: 'source-plate', name: '源晶甲片', rarity: 'epic', type: '生存', description: '源晶甲片削弱普通怪造成的伤害。', effectText: '普通怪伤害 -15%', apply: (scene) => { scene.relicState.damageReductionFromMinions += 0.15; } },
 
   { id: 'small-potion', name: '小型生命药水', rarity: 'common', type: '回复', description: '立即饮用的应急药剂。', effectText: '立即回复 22 HP', stackable: true, apply: (scene) => { scene.healPlayer(22); } },
@@ -816,7 +816,7 @@ const EVENT_PACK: EventPackDef[] = [
       if (!cleansed) scene.relicState.temporaryShield = Math.max(scene.relicState.temporaryShield, 6);
       return {
         log: cleansed ? '净化之光驱散了异常状态。' : '净化之光没有找到异常状态，转化为 6 点临时护盾。',
-        floatingText: cleansed ? '异常状态已清除' : 'Shield 6',
+        floatingText: cleansed ? '异常状态已清除' : '临时护盾 +6',
         opensPortal: true
       };
     }
@@ -2122,7 +2122,7 @@ export class DungeonScene extends Phaser.Scene {
   private applyRoomEntryRelics() {
     if (this.currentRoomIndex > 0 && this.hasRelic('crystal-shield')) {
       this.relicState.temporaryShield = Math.max(this.relicState.temporaryShield, 10);
-      this.showFloatingText(this.player.x, this.player.y - 70, '晶体护盾 Shield 10', '#8ffcff');
+      this.showFloatingText(this.player.x, this.player.y - 70, '晶体护盾 +10', '#8ffcff');
     }
     if (this.currentRoom.kind === 'boss' && this.hasRelic('spring-echo') && !this.relicState.bossRoomHealUsed) {
       this.relicState.bossRoomHealUsed = true;
@@ -3042,7 +3042,7 @@ export class DungeonScene extends Phaser.Scene {
         onComplete: () => spark.destroy()
       });
     }
-    this.showFloatingText(this.player.x, this.player.y - 58, `Shield -${amount}`, '#8ffcff');
+    this.showFloatingText(this.player.x, this.player.y - 58, `护盾 -${amount}`, '#8ffcff');
   }
 
   private spawnDashTrail() {
@@ -4143,7 +4143,7 @@ export class DungeonScene extends Phaser.Scene {
     this.invincibleUntil = this.time.now + (options.invincibleMs ?? 800);
     this.sfx.play('hurt');
     if (damage > 0) this.showDamageNumber(this.player.x, this.player.y - 34, damage, options.emphasized ? '#ff4f7b' : '#ff8aa8', options.emphasized);
-    else this.showFloatingText(this.player.x, this.player.y - 34, 'Shield', '#8ffcff');
+    else this.showFloatingText(this.player.x, this.player.y - 34, '护盾', '#8ffcff');
     this.showPlayerDamageFeedback(damage, skillShieldAbsorb + shieldAbsorb);
     this.cameras.main.shake(options.shakeDuration ?? (damage >= 6 ? 150 : 100), options.shakeIntensity ?? (damage >= 6 ? 0.006 : 0.004));
     const absorbed = skillShieldAbsorb + shieldAbsorb;
@@ -4298,7 +4298,7 @@ export class DungeonScene extends Phaser.Scene {
       : trueElite ? Phaser.Math.Between(24, 34) : Phaser.Math.Between(16, 22);
     const gold = baseGold + this.relicState.roomClearGoldBonus;
     this.gold += gold;
-    this.showFloatingText(this.player.x, this.player.y - 98, `Gold +${gold}`, '#ffe6ad');
+    this.showFloatingText(this.player.x, this.player.y - 98, `金币 +${gold}`, '#ffe6ad');
     if (this.relicState.roomClearHeal > 0) {
       const healed = this.healPlayer(this.relicState.roomClearHeal);
       if (healed > 0) this.log(`战斗清理后回复 ${healed} HP。`);
