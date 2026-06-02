@@ -5,12 +5,18 @@ const toFiniteNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
-const clampPercent = (value: unknown) => Math.min(100, Math.max(0, toFiniteNumber(value)));
+const isFiniteNumber = (value: unknown) => Number.isFinite(Number(value));
+const formatNumber = (value: unknown) => (isFiniteNumber(value) ? Number(value) : '暂无');
+const formatPercent = (value: unknown) => {
+  if (!isFiniteNumber(value)) return '暂无';
+  return `${Math.min(100, Math.max(0, Number(value))).toFixed(0)}%`;
+};
 const formatScore = (value: unknown) => {
   const score = Number(value);
   return Number.isFinite(score) ? score : '暂无';
 };
 const formatDuration = (seconds: unknown) => {
+  if (!isFiniteNumber(seconds)) return '暂无';
   const duration = Math.max(0, Math.round(toFiniteNumber(seconds)));
   return `${Math.floor(duration / 60)}m ${duration % 60}s`;
 };
@@ -41,10 +47,10 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
             <td>{isVictoryRun(run) ? '胜利' : '失败'}</td>
             <td>{getRunRoleName(run)}</td>
             <td>{formatDuration(run.durationSeconds)}</td>
-            <td>{toFiniteNumber(run.kills)}</td>
-            <td>{toFiniteNumber(run.goldEarned)}</td>
-            <td>{toFiniteNumber(run.relicsFound)}</td>
-            <td>{clampPercent(run.bossRemainingHpPercent).toFixed(0)}%</td>
+            <td>{formatNumber(run.kills)}</td>
+            <td>{formatNumber(run.goldEarned)}</td>
+            <td>{formatNumber(run.relicsFound)}</td>
+            <td>{formatPercent(run.bossRemainingHpPercent)}</td>
             <td>{formatScore(run.score)}</td>
           </tr>
         ))}
