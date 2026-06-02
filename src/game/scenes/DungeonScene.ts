@@ -4431,7 +4431,7 @@ export class DungeonScene extends Phaser.Scene {
       wordWrap: { width: 580 },
       lineSpacing: 5
     }));
-    this.eventPanel.add(this.add.text(-290, -38, `Effect: ${this.activeEvent.effectText}`, {
+    this.eventPanel.add(this.add.text(-290, -38, `效果：${this.activeEvent.effectText}`, {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#ffe6ad',
