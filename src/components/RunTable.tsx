@@ -11,10 +11,6 @@ const formatPercent = (value: unknown) => {
   if (!isFiniteNumber(value)) return '暂无';
   return `${Math.min(100, Math.max(0, Number(value))).toFixed(0)}%`;
 };
-const formatScore = (value: unknown) => {
-  const score = Number(value);
-  return Number.isFinite(score) ? score : '暂无';
-};
 const formatDuration = (seconds: unknown) => {
   if (!isFiniteNumber(seconds)) return '暂无';
   const duration = Math.max(0, Math.round(toFiniteNumber(seconds)));
@@ -51,7 +47,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
             <td>{formatNumber(run.goldEarned)}</td>
             <td>{formatNumber(run.relicsFound)}</td>
             <td>{formatPercent(run.bossRemainingHpPercent)}</td>
-            <td>{formatScore(run.score)}</td>
+            <td>{formatNumber(run.score)}</td>
           </tr>
         ))}
       </tbody>
