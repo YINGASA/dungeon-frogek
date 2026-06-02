@@ -520,7 +520,7 @@ const EVENT_PACK: EventPackDef[] = [
       scene.applySafeEventDamage(damage, '尖刺陷阱');
       return {
         log: `尖刺陷阱刺穿护甲，造成 ${damage} 点伤害。`,
-        floatingText: `尖刺陷阱 -${damage} HP`,
+        floatingText: `尖刺陷阱 -${damage} 生命`,
         opensPortal: true
       };
     }
@@ -542,7 +542,7 @@ const EVENT_PACK: EventPackDef[] = [
       scene.applyNextRoomSlow();
       return {
         log: '地面塌陷，碎石拖慢了你的脚步。',
-        floatingText: `塌陷 -${damage} HP / 下房减速`,
+        floatingText: `塌陷 -${damage} 生命 / 下房减速`,
         opensPortal: true
       };
     }
@@ -601,8 +601,8 @@ const EVENT_PACK: EventPackDef[] = [
     applyEffect: (scene) => {
       scene.player.stats.atk += 1;
       return {
-        log: '你从破损武器架中找到可用武器，ATK +1。',
-        floatingText: 'ATK +1',
+        log: '你从破损武器架中找到可用武器，攻击 +1。',
+        floatingText: '攻击 +1',
         opensPortal: true
       };
     }
@@ -621,8 +621,8 @@ const EVENT_PACK: EventPackDef[] = [
     applyEffect: (scene) => {
       scene.player.stats.def += 1;
       return {
-        log: '你找到一块还能使用的护甲片，DEF +1。',
-        floatingText: 'DEF +1',
+        log: '你找到一块还能使用的护甲片，防御 +1。',
+        floatingText: '防御 +1',
         opensPortal: true
       };
     }
@@ -665,7 +665,7 @@ const EVENT_PACK: EventPackDef[] = [
       const healed = scene.healPlayer(baseHeal + lowHpBonus);
       return {
         log: '源晶治疗泉恢复了你的生命。',
-        floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
+        floatingText: healed > 0 ? `生命 +${healed}` : '生命已满',
         opensPortal: true
       };
     }
@@ -685,7 +685,7 @@ const EVENT_PACK: EventPackDef[] = [
       const healed = scene.healPlayer(Phaser.Math.Between(8, 12) + scene.relicState.potionHealBonus);
       return {
         log: '你在废弃药剂箱中找到一支还能使用的药剂。',
-        floatingText: healed > 0 ? `HP +${healed}` : '生命已满',
+        floatingText: healed > 0 ? `生命 +${healed}` : '生命已满',
         opensPortal: true
       };
     }
@@ -705,8 +705,8 @@ const EVENT_PACK: EventPackDef[] = [
       const healed = scene.healPlayer(Phaser.Math.Between(12, 18) + scene.relicState.potionHealBonus);
       scene.applyPoison(1);
       return {
-        log: `你饮下破损药锅里的残液，回复 ${healed} HP，但毒雾也钻进了肺里。`,
-        floatingText: healed > 0 ? `HP +${healed} / 中毒 1 房` : '中毒 1 房',
+        log: `你饮下破损药锅里的残液，回复 ${healed} 生命，但毒雾也钻进了肺里。`,
+        floatingText: healed > 0 ? `生命 +${healed} / 中毒 1 房` : '中毒 1 房',
         opensPortal: true
       };
     }
@@ -729,7 +729,7 @@ const EVENT_PACK: EventPackDef[] = [
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `封印祭坛抽走了少量生命，并吐出一缕可用力量：${scene.getRewardDisplayName(reward)}。` : '封印祭坛抽走了少量生命，但回声很快散尽。',
-        floatingText: reward ? `-12 HP / ${scene.getRewardDisplayName(reward)}` : '-12 HP',
+        floatingText: reward ? `-12 生命 / ${scene.getRewardDisplayName(reward)}` : '-12 生命',
         opensPortal: true
       };
     }
@@ -781,7 +781,7 @@ const EVENT_PACK: EventPackDef[] = [
       scene.gold += gold;
       return {
         log: `裂隙低语灼伤了你的意志，但留下 ${gold} 枚带着余温的金币。`,
-        floatingText: `-10 HP / 金币 +${gold}`,
+        floatingText: `-10 生命 / 金币 +${gold}`,
         opensPortal: true
       };
     }
@@ -800,8 +800,8 @@ const EVENT_PACK: EventPackDef[] = [
     applyEffect: (scene) => {
       const healed = scene.healPlayer(Phaser.Math.Between(8, 14));
       return {
-        log: healed > 0 ? `你在熄灭的营火旁短暂休整，回复 ${healed} HP。` : '营火只剩余温，但墙上的安全记号让你确认前路暂时稳定。',
-        floatingText: healed > 0 ? `HP +${healed}` : '前路暂时安全',
+        log: healed > 0 ? `你在熄灭的营火旁短暂休整，回复 ${healed} 生命。` : '营火只剩余温，但墙上的安全记号让你确认前路暂时稳定。',
+        floatingText: healed > 0 ? `生命 +${healed}` : '前路暂时安全',
         opensPortal: true
       };
     }
@@ -885,7 +885,7 @@ const EVENT_PACK: EventPackDef[] = [
       if (reward) scene.grantReward(reward);
       return {
         log: reward ? `不稳定源晶灼伤了你，但也释放出可用能量：${scene.getRewardDisplayName(reward)}。` : '不稳定源晶灼伤了你，但残余能量很快消散。',
-        floatingText: reward ? `-12 HP / ${scene.getRewardDisplayName(reward)}` : '-12 HP',
+        floatingText: reward ? `-12 生命 / ${scene.getRewardDisplayName(reward)}` : '-12 生命',
         opensPortal: true
       };
     }
