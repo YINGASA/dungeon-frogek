@@ -24,7 +24,10 @@ const formatAveragePercent = (runs: GameRun[], key: keyof GameRun) => {
 };
 const formatReportItems = (value: AnalysisReport[keyof AnalysisReport] | null | undefined) => {
   const items = Array.isArray(value) ? value : value == null ? [] : [value];
-  return items.filter((item) => item != null).map((item) => String(item).trim()).filter(Boolean);
+  return items.map((item) => {
+    if (item == null || typeof item === 'object') return '';
+    return String(item).trim();
+  }).filter(Boolean);
 };
 const reportSections: { key: keyof AnalysisReport; title: string }[] = [
   { key: 'summary', title: '综合摘要' },
