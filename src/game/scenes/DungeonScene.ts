@@ -512,7 +512,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 10,
     effectType: 'spike',
-    effectText: '受到 10-16 点伤害，最低保留 1 HP。',
+    effectText: '受到 10-16 点伤害，最低保留 1 生命。',
     followUpObjective: '通道会在陷阱停止后开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -555,7 +555,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 8,
     effectType: 'poison',
-    effectText: '获得中毒 2 房；每进入新房扣 4 HP，最低保留 1 HP。',
+    effectText: '获得中毒 2 房；每进入新房扣 4 生命，最低保留 1 生命。',
     followUpObjective: '寻找净化或撑过接下来的房间。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -575,7 +575,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 8,
     effectType: 'rust',
-    effectText: '接下来 2 个房间 DEF -1，不会低于 0。',
+    effectText: '接下来 2 个房间防御 -1，不会低于 0。',
     followUpObjective: '诅咒结束后护甲会恢复。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -595,7 +595,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 8,
     effectType: 'attack',
-    effectText: '获得 ATK +1。',
+    effectText: '获得攻击 +1。',
     followUpObjective: '整理武器后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -615,7 +615,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 8,
     effectType: 'defense',
-    effectText: '获得 DEF +1。',
+    effectText: '获得防御 +1。',
     followUpObjective: '装好护甲后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -656,7 +656,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 3,
     effectType: 'heal',
-    effectText: '回复 12-18 HP；低于 35% HP 时额外回复 6 HP。',
+    effectText: '回复 12-18 生命；低于 35% 生命时额外回复 6 生命。',
     followUpObjective: '恢复后继续深入。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -678,7 +678,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 4,
     effectType: 'potion-box',
-    effectText: '回复 8-12 HP，受药剂遗物加成影响。',
+    effectText: '回复 8-12 生命，受药剂遗物加成影响。',
     followUpObjective: '使用药剂后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -698,7 +698,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 6,
     effectType: 'potion-box',
-    effectText: '回复 12-18 HP，但获得中毒 1 房。',
+    effectText: '回复 12-18 生命，但获得中毒 1 房。',
     followUpObjective: '药性稳定后，传送门会重新开启。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -772,7 +772,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'gold',
-    effectText: '损失 10 HP，获得 18-28 金币。',
+    effectText: '损失 10 生命，获得 18-28 金币。',
     followUpObjective: '低语退去后，继续深入地牢。',
     roomTags: ['event'],
     applyEffect: (scene) => {
@@ -794,7 +794,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'common',
     weight: 4,
     effectType: 'heal',
-    effectText: '回复 8-14 HP；若生命已满，仅获得一条安全日志。',
+    effectText: '回复 8-14 生命；若生命已满，仅获得一条安全日志。',
     followUpObjective: '短暂休整后，传送门会稳定下来。',
     roomTags: ['event'],
     applyEffect: (scene) => {
