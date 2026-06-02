@@ -12,13 +12,23 @@ const toFiniteNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const finiteValues = (runs: GameRun[], key: keyof GameRun) => runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
+const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
 const avg = (runs: GameRun[], key: keyof GameRun) => {
-  const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  const values = finiteValues(runs, key);
+  return values.length ? average(values) : 0;
 };
 const avgPercent = (runs: GameRun[], key: keyof GameRun) => {
-  const values = runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite).map((value) => clamp(value, 0, 100));
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  const values = finiteValues(runs, key).map((value) => clamp(value, 0, 100));
+  return values.length ? average(values) : 0;
+};
+const formatAverage = (runs: GameRun[], key: keyof GameRun, formatter = (value: number) => value.toFixed(1)) => {
+  const values = finiteValues(runs, key);
+  return values.length ? formatter(average(values)) : '暂无';
+};
+const formatAveragePercent = (runs: GameRun[], key: keyof GameRun) => {
+  const values = finiteValues(runs, key).map((value) => clamp(value, 0, 100));
+  return values.length ? `${average(values).toFixed(1)}%` : '暂无';
 };
 const reportSections: { key: keyof AnalysisReport; title: string }[] = [
   { key: 'summary', title: '综合摘要' },
@@ -84,12 +94,12 @@ export const AnalyticsPage = () => {
         <StatCard label="总试玩次数" value={runs.length} />
         <StatCard label="通关次数" value={wins.length} />
         <StatCard label="通关率" value={pct(winRate)} />
-        <StatCard label="平均时长" value={`${(avg(runs, 'durationSeconds') / 60).toFixed(1)}m`} />
-        <StatCard label="平均击杀" value={avg(runs, 'kills').toFixed(1)} />
-        <StatCard label="平均金币" value={avg(runs, 'goldEarned').toFixed(1)} />
-        <StatCard label="平均遗物" value={avg(runs, 'relicsFound').toFixed(1)} />
+        <StatCard label="平均时长" value={formatAverage(runs, 'durationSeconds', (value) => `${(value / 60).toFixed(1)}m`)} />
+        <StatCard label="平均击杀" value={formatAverage(runs, 'kills')} />
+        <StatCard label="平均金币" value={formatAverage(runs, 'goldEarned')} />
+        <StatCard label="平均遗物" value={formatAverage(runs, 'relicsFound')} />
         <StatCard label="常见失败原因" value={commonFailureReason} />
-        <StatCard label="首领剩余" value={`${bossRemainingAverage.toFixed(1)}%`} />
+        <StatCard label="首领剩余" value={formatAveragePercent(runs, 'bossRemainingHpPercent')} />
         <StatCard label="体验评分" value={experienceScore} />
       </section>
       <section className="panel">
