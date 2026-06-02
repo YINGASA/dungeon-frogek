@@ -2,8 +2,8 @@ import { GameRun } from '../types/game';
 
 const victoryReasonPattern = /源晶净化完成|胜利|通关|Boss 击败|boss 击败|victory|win|won|cleared|clear/i;
 const defeatReasonPattern = /失败|defeat|death|dead|lose|lost|failed/i;
-const cleanLabel = (value: string | undefined, fallback: string) => {
-  const label = value?.trim();
+const cleanLabel = (value: unknown, fallback: string) => {
+  const label = typeof value === 'string' ? value.trim() : '';
   return label || fallback;
 };
 
