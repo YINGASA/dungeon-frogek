@@ -23,6 +23,12 @@ type CombatWave = EnemySpawnDef[];
 type WeaponId = 'short-sword' | 'heavy-blade' | 'spear' | 'dual-daggers';
 type HeroId = 'relic-hunter';
 
+const RARITY_DISPLAY_NAMES: Record<RewardRarity, string> = {
+  common: '普通',
+  rare: '稀有',
+  epic: '史诗'
+};
+
 interface HeroConfig {
   id: HeroId;
   name: string;
@@ -1449,7 +1455,7 @@ export class DungeonScene extends Phaser.Scene {
   private getStatusRelicLines() {
     if (this.relicState.relics.length === 0) return '暂无遗物';
     return this.relicState.relics
-      .map((relic) => `${this.getRewardDisplayName(relic)}｜${relic.rarity.toUpperCase()}｜${relic.effectText}\n${this.getRewardDisplayDescription(relic)}`)
+      .map((relic) => `${this.getRewardDisplayName(relic)}｜${RARITY_DISPLAY_NAMES[relic.rarity]}｜${relic.effectText}\n${this.getRewardDisplayDescription(relic)}`)
       .join('\n');
   }
 
@@ -4361,7 +4367,7 @@ export class DungeonScene extends Phaser.Scene {
     card.add(rect);
     card.add(this.add.text(-88, -94, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
     card.add(this.add.text(0, -92, this.getRewardDisplayName(reward), { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', align: 'center', wordWrap: { width: 168 } }).setOrigin(0.5));
-    card.add(this.add.text(0, -58, `${reward.rarity.toUpperCase()} · ${reward.type}`, { fontFamily: 'monospace', fontSize: '13px', color: reward.rarity === 'common' ? '#c8d8e8' : reward.rarity === 'rare' ? '#8ffcff' : '#d9b8ff' }).setOrigin(0.5));
+    card.add(this.add.text(0, -58, `${RARITY_DISPLAY_NAMES[reward.rarity]} · ${reward.type}`, { fontFamily: 'monospace', fontSize: '13px', color: reward.rarity === 'common' ? '#c8d8e8' : reward.rarity === 'rare' ? '#8ffcff' : '#d9b8ff' }).setOrigin(0.5));
     card.add(this.add.text(-82, -26, this.getRewardDisplayDescription(reward), { fontFamily: 'monospace', fontSize: '13px', color: '#dff7ff', wordWrap: { width: 164 }, lineSpacing: 4 }));
     card.add(this.add.rectangle(0, 74, 166, 38, 0x07101e, 0.82).setStrokeStyle(1, color, 0.72));
     card.add(this.add.text(0, 74, reward.effectText, { fontFamily: 'monospace', fontSize: '13px', color: '#ffe6ad', align: 'center', wordWrap: { width: 152 } }).setOrigin(0.5));
