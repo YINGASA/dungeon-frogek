@@ -1399,10 +1399,10 @@ export class DungeonScene extends Phaser.Scene {
 
   private getStatusBasicLines() {
     return [
-      `HP：${Math.max(0, Math.ceil(this.player.stats.hp))} / ${this.player.stats.maxHp}`,
+      `生命：${Math.max(0, Math.ceil(this.player.stats.hp))} / ${this.player.stats.maxHp}`,
       `L 护盾：${this.isSkillShieldActive() ? `${this.shieldRemaining} / ${SHIELD_CAPACITY}` : '未激活'}`,
-      `ATK：${this.player.stats.atk}`,
-      `DEF：${this.player.stats.def}`,
+      `攻击：${this.player.stats.atk}`,
+      `防御：${this.player.stats.def}`,
       `金币：${this.gold}`,
       `遗物：${this.relicState.relics.length}`,
       `当前角色：${this.selectedHero.name}`,
@@ -5073,7 +5073,7 @@ export class DungeonScene extends Phaser.Scene {
       `武器：${this.selectedWeapon.name}    流派：${this.selectedWeapon.styleSummary}    构筑：${this.getBuildSummary()}`,
       `遗物：${this.relicState.relics.length}    史诗：${hasEpic}    金币：${this.gold}`,
       `异常：${this.eventStats.poisoned ? '中过毒' : '无中毒'} / ${this.eventStats.cursed ? '中过诅咒' : '无诅咒'}    负面事件：${this.eventStats.negative}    战斗事件：${this.eventStats.combat}`,
-      `最终状态：HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK ${this.player.stats.atk}  DEF ${this.player.stats.def}`,
+      `最终状态：生命 ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  攻击 ${this.player.stats.atk}  防御 ${this.player.stats.def}`,
       `路线：${routeSummary}`,
       `遗物列表：${relicNames}`,
       `原因：${run.deathReason}`
