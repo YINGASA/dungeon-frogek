@@ -18,7 +18,7 @@ const read = <T>(key: string, fallback: T): T => {
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-const isStoredRun = (value: unknown): value is GameRun => isRecord(value) && typeof value.id === 'string';
+const isStoredRun = (value: unknown): value is GameRun => isRecord(value) && typeof value.id === 'string' && value.id.trim().length > 0;
 
 const write = (key: string, value: unknown) => {
   try {
@@ -66,7 +66,7 @@ export const storageService = {
   },
   getLastRun(): GameRun | null {
     const run = read<unknown>(keys.lastRun, null);
-    return isRecord(run) && typeof run.id === 'string' ? (run as unknown as GameRun) : null;
+    return isStoredRun(run) ? run : null;
   },
   getAssetManifest(): AssetManifest | null {
     const manifest = read<unknown>(keys.assets, null);
