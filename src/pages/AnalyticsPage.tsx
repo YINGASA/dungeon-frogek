@@ -14,14 +14,6 @@ const toFiniteNumber = (value: unknown, fallback = 0) => {
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const finiteValues = (runs: GameRun[], key: keyof GameRun) => runs.map((run) => toFiniteNumber(run[key], NaN)).filter(Number.isFinite);
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-const avg = (runs: GameRun[], key: keyof GameRun) => {
-  const values = finiteValues(runs, key);
-  return values.length ? average(values) : 0;
-};
-const avgPercent = (runs: GameRun[], key: keyof GameRun) => {
-  const values = finiteValues(runs, key).map((value) => clamp(value, 0, 100));
-  return values.length ? average(values) : 0;
-};
 const formatAverage = (runs: GameRun[], key: keyof GameRun, formatter = (value: number) => value.toFixed(1)) => {
   const values = finiteValues(runs, key);
   return values.length ? formatter(average(values)) : '暂无';
@@ -49,7 +41,10 @@ export const AnalyticsPage = () => {
   const hasRuns = runs.length > 0;
   const wins = runs.filter(isVictoryRun);
   const winRate = runs.length ? wins.length / runs.length : 0;
-  const bossRemainingAverage = avgPercent(runs, 'bossRemainingHpPercent');
+  const bossRemainingValues = finiteValues(runs, 'bossRemainingHpPercent').map((value) => clamp(value, 0, 100));
+  const bossRemainingAverage = bossRemainingValues.length ? average(bossRemainingValues) : 0;
+  const durationValues = finiteValues(runs, 'durationSeconds');
+  const eventValues = finiteValues(runs, 'eventsTriggered');
   const experienceScore = hasRuns ? clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100) : '暂无';
   const failureRuns = runs.filter(isFailedRun);
   const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
@@ -64,9 +59,9 @@ export const AnalyticsPage = () => {
   const rules = hasRuns ? [
     winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
     winRate > 0.8 && '通关率高于 80%，难度不足。',
-    bossRemainingAverage > 50 && '首领平均剩余血量高于 50%，首领过强。',
-    avg(runs, 'durationSeconds') < level.durationMinutes * 60 * 0.5 && '平均游戏时长低于目标时长 50%，关卡过短。',
-    avg(runs, 'eventsTriggered') < 0.5 && '事件触发率低，地图路径设计不足。',
+    bossRemainingValues.length > 0 && bossRemainingAverage > 50 && '首领平均剩余血量高于 50%，首领过强。',
+    durationValues.length > 0 && average(durationValues) < level.durationMinutes * 60 * 0.5 && '平均游戏时长低于目标时长 50%，关卡过短。',
+    eventValues.length > 0 && average(eventValues) < 0.5 && '事件触发率低，地图路径设计不足。',
     `角色胜率 ${roleRates}`
   ].filter(Boolean) : ['暂无对局数据。完成一次试玩结算后，这里会显示规则诊断。'];
   const generate = async () => {
