@@ -39,7 +39,12 @@ const remove = (key: string) => {
 export const storageService = {
   getLevel(): LevelConfig {
     const level = read<unknown>(keys.level, DEFAULT_LEVEL);
-    if (!isRecord(level) || typeof level.id !== 'string' || typeof level.name !== 'string') {
+    if (
+      !isRecord(level)
+      || typeof level.id !== 'string'
+      || typeof level.name !== 'string'
+      || !Number.isFinite(Number(level.durationMinutes))
+    ) {
       return DEFAULT_LEVEL;
     }
     if (level.id === DEFAULT_LEVEL.id || level.name.includes('AI Dungeon Forge') || level.name.includes('Data Demon')) {
