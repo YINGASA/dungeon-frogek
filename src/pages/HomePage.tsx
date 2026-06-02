@@ -23,7 +23,7 @@ export const HomePage = ({ onNavigate }: { onNavigate: (tab: TabId) => void }) =
       <StatCard label="当前版本" value="v1.6.10" hint="线上试玩分支 playable" />
       <StatCard label="地牢路线" value="6-8 房" hint="普通、高级、精英、事件、Boss" />
       <StatCard label="武器选择" value="4 种" hint="短剑、重刃、长枪、双匕" />
-      <StatCard label="成长记录" value="localStorage" hint="对局、金币、遗物、结算" />
+      <StatCard label="成长记录" value="本地保存" hint="对局、金币、遗物、结算" />
     </div>
     <section className="feature-grid">
       {[
