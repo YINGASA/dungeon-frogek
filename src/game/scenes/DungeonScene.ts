@@ -4714,7 +4714,7 @@ export class DungeonScene extends Phaser.Scene {
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
     this.updateLowHpWarning(time);
-    const recentRelics = this.relicState.relics.slice(-3).map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
+    const recentRelics = this.relicState.relics.slice(-3).map((relic) => this.getRewardDisplayName(relic)).join(' / ') || '无';
     const statuses = [
       this.poisonRooms > 0 ? `Poison ${this.poisonRooms} room` : '',
       this.rustRooms > 0 ? `Rust ${this.rustRooms} room` : '',
@@ -5064,14 +5064,14 @@ export class DungeonScene extends Phaser.Scene {
     this.settlementPanel = panel;
     panel.add(this.add.rectangle(0, 0, 720, 470, 0x07101e, 0.98).setStrokeStyle(2, victory ? 0x35e7c4 : 0xff4f7b));
     panel.add(this.add.text(-310, -205, victory ? '源晶已净化' : '遗迹探索终止', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }));
-    const relicNames = this.relicState.relics.map((relic) => this.getRewardDisplayName(relic)).join(' / ') || 'None';
-    const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? 'Yes' : 'No';
+    const relicNames = this.relicState.relics.map((relic) => this.getRewardDisplayName(relic)).join(' / ') || '无';
+    const hasEpic = this.relicState.relics.some((relic) => relic.rarity === 'epic') ? '有' : '无';
     panel.add(this.add.text(-310, -160, [
       `结果：${victory ? '胜利' : '失败'}    评级：${grade}    用时：${durationSeconds}s`,
       `房间：${visitedRooms.length}    击败：${this.kills}    高级/精英房：${this.getEliteRoomsVisited()}    事件：${this.eventStats.triggered}`,
       `伤害承受：${this.damageTaken}    技能使用：${this.skillUses}    奖励选择：${this.rewardChoiceCount}`,
       `武器：${this.selectedWeapon.name}    流派：${this.selectedWeapon.styleSummary}    构筑：${this.getBuildSummary()}`,
-      `遗物：${this.relicState.relics.length}    Epic：${hasEpic}    金币：${this.gold}`,
+      `遗物：${this.relicState.relics.length}    史诗：${hasEpic}    金币：${this.gold}`,
       `异常：${this.eventStats.poisoned ? '中过毒' : '无中毒'} / ${this.eventStats.cursed ? '中过诅咒' : '无诅咒'}    负面事件：${this.eventStats.negative}    战斗事件：${this.eventStats.combat}`,
       `最终状态：HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}  ATK ${this.player.stats.atk}  DEF ${this.player.stats.def}`,
       `路线：${routeSummary}`,
