@@ -22,6 +22,10 @@ const formatAveragePercent = (runs: GameRun[], key: keyof GameRun) => {
   const values = finiteValues(runs, key).map((value) => clamp(value, 0, 100));
   return values.length ? `${average(values).toFixed(1)}%` : '暂无';
 };
+const formatReportItems = (value: AnalysisReport[keyof AnalysisReport]) => {
+  const items = Array.isArray(value) ? value : [value];
+  return items.map((item) => String(item).trim()).filter(Boolean);
+};
 const reportSections: { key: keyof AnalysisReport; title: string }[] = [
   { key: 'summary', title: '综合摘要' },
   { key: 'balanceIssues', title: '平衡问题' },
@@ -112,7 +116,7 @@ export const AnalyticsPage = () => {
       {report && <section className="preview-grid">
         {reportSections.map(({ key, title }) => {
           const value = report[key];
-          const items = Array.isArray(value) ? value.filter(Boolean) : [value || '暂无摘要。'];
+          const items = formatReportItems(value);
           return (
             <article className="panel" key={key}>
               <h3>{title}</h3>
