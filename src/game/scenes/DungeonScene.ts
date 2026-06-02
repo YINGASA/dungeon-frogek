@@ -469,7 +469,7 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     title: '古老祭坛',
     description: '一座布满裂纹的祭坛仍在低声共鸣，源晶碎片漂浮在祭坛上方。',
     options: [
-      { text: '献祭 15 HP，获得 ATK +3', disabledText: '生命不足', canChoose: (scene) => scene.player.stats.hp > 15, apply: (scene) => { scene.player.stats.hp -= 15; scene.player.stats.atk += 3; return '献祭生命，ATK +3。'; } },
+      { text: '献祭 15 生命，获得攻击 +3', disabledText: '生命不足', canChoose: (scene) => scene.player.stats.hp > 15, apply: (scene) => { scene.player.stats.hp -= 15; scene.player.stats.atk += 3; return '献祭生命，攻击 +3。'; } },
       { text: '献祭 20 金币，获得随机稀有奖励', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 20, apply: (scene) => { scene.gold -= 20; const reward = scene.pickRewardByRarity('rare', []); if (reward) scene.grantReward(reward); return reward ? `献祭金币，获得 ${scene.getRewardDisplayName(reward)}。` : '祭坛沉默了。'; } },
       { text: '离开，无事发生', canChoose: () => true, apply: () => '你离开了古老祭坛。' }
     ]
@@ -478,8 +478,8 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     title: '受伤的探险者',
     description: '一名受伤的探险者靠在墙边，他手里紧握着一枚微光护符。',
     options: [
-      { text: '给予 10 金币，获得小型生命药水效果', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 10, apply: (scene) => { scene.gold -= 10; const healed = scene.healPlayer(25 + scene.relicState.potionHealBonus); return `给予金币，回复 ${healed} HP。`; } },
-      { text: '帮助治疗，回复 15 HP', canChoose: () => true, apply: (scene) => { const healed = scene.healPlayer(15); return `帮助探险者，回复 ${healed} HP。`; } },
+      { text: '给予 10 金币，获得小型生命药水效果', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 10, apply: (scene) => { scene.gold -= 10; const healed = scene.healPlayer(25 + scene.relicState.potionHealBonus); return `给予金币，回复 ${healed} 生命。`; } },
+      { text: '帮助治疗，回复 15 生命', canChoose: () => true, apply: (scene) => { const healed = scene.healPlayer(15); return `帮助探险者，回复 ${healed} 生命。`; } },
       { text: '离开', canChoose: () => true, apply: () => '你没有停留。' }
     ]
   },
@@ -488,7 +488,7 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     description: '一枚污染源晶嵌在地面，里面传来微弱心跳声。',
     options: [
       { text: '吸收源晶，获得随机奖励，但受到 12 点伤害', canChoose: (scene) => scene.player.stats.hp > 12, disabledText: '生命不足', apply: (scene) => { const reward = scene.pickRewardByRarity(Phaser.Math.Between(1, 100) <= 75 ? 'rare' : 'common', []); scene.player.stats.hp = Math.max(1, scene.player.stats.hp - 12); if (reward) scene.grantReward(reward); return reward ? `吸收源晶，获得 ${scene.getRewardDisplayName(reward)}，受到 12 点伤害。` : '源晶碎裂，你受到 12 点伤害。'; } },
-      { text: '净化源晶，回复 20 HP', canChoose: () => true, apply: (scene) => { const healed = scene.healPlayer(20); return `净化源晶，回复 ${healed} HP。`; } },
+      { text: '净化源晶，回复 20 生命', canChoose: () => true, apply: (scene) => { const healed = scene.healPlayer(20); return `净化源晶，回复 ${healed} 生命。`; } },
       { text: '打碎源晶，获得 20 金币', canChoose: () => true, apply: (scene) => { scene.gold += 20; return '打碎源晶，获得 20 金币。'; } }
     ]
   },
@@ -496,8 +496,8 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     title: '破损武器架',
     description: '一座腐朽武器架倒在角落，仍能看见几件可用的装备。',
     options: [
-      { text: '搜索武器，获得 ATK +2', canChoose: () => true, apply: (scene) => { scene.player.stats.atk += 2; return '找到可用武器，ATK +2。'; } },
-      { text: '搜索护甲，获得 DEF +1', canChoose: () => true, apply: (scene) => { scene.player.stats.def += 1; return '找到护甲残片，DEF +1。'; } },
+      { text: '搜索武器，获得攻击 +2', canChoose: () => true, apply: (scene) => { scene.player.stats.atk += 2; return '找到可用武器，攻击 +2。'; } },
+      { text: '搜索护甲，获得防御 +1', canChoose: () => true, apply: (scene) => { scene.player.stats.def += 1; return '找到护甲残片，防御 +1。'; } },
       { text: '离开', canChoose: () => true, apply: () => '你离开了武器架。' }
     ]
   }
