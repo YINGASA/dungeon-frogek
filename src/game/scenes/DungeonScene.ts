@@ -2121,7 +2121,7 @@ export class DungeonScene extends Phaser.Scene {
     this.rewardTaken = true;
     this.sfx.play('pickup');
     this.showRestUsedEffect();
-    this.showFloatingText(this.player.x, this.player.y - 72, healed > 0 ? `恢复 +${healed} HP` : '生命已满', '#8ffcff');
+    this.showFloatingText(this.player.x, this.player.y - 72, healed > 0 ? `恢复 +${healed} 生命` : '生命已满', '#8ffcff');
     this.openPortal(healed > 0 ? `补给房：源晶治疗台恢复了 ${healed} 点生命。` : '补给房：生命已满，补给已使用。');
   }
 
@@ -2133,8 +2133,8 @@ export class DungeonScene extends Phaser.Scene {
     if (this.currentRoom.kind === 'boss' && this.hasRelic('spring-echo') && !this.relicState.bossRoomHealUsed) {
       this.relicState.bossRoomHealUsed = true;
       this.healPlayer(18);
-      this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 HP +18', '#d6b4ff');
-      this.log('源泉残响触发：进入 Boss 房回复 18 HP。');
+      this.showFloatingText(this.player.x, this.player.y - 92, '源泉残响 生命 +18', '#d6b4ff');
+      this.log('源泉残响触发：进入 Boss 房回复 18 生命。');
     }
   }
 
@@ -2145,8 +2145,8 @@ export class DungeonScene extends Phaser.Scene {
     if (this.poisonRooms > 0) {
       this.applySafeEventDamage(4, '中毒');
       this.poisonRooms = Math.max(0, this.poisonRooms - 1);
-      this.showFloatingText(this.player.x, this.player.y - 92, '中毒 -4 HP', '#9bff7a');
-      this.log(`中毒发作，损失 4 HP。剩余 ${this.poisonRooms} 房。`);
+      this.showFloatingText(this.player.x, this.player.y - 92, '中毒 -4 生命', '#9bff7a');
+      this.log(`中毒发作，损失 4 生命。剩余 ${this.poisonRooms} 房。`);
     }
 
     if (this.rustRooms > 0) {
@@ -3963,7 +3963,7 @@ export class DungeonScene extends Phaser.Scene {
     this.gold += wasBoss ? 60 : 8;
     if (!wasBoss && this.hasRelic('life-drain')) {
       this.healPlayer(2);
-      this.log(`生命汲取触发：击杀 ${name} 回复 2 HP。`);
+      this.log(`生命汲取触发：击杀 ${name} 回复 2 生命。`);
     }
     this.destroyUnitHud(enemy);
     this.destroyEnemyVisualOverlay(enemy);
@@ -4155,7 +4155,7 @@ export class DungeonScene extends Phaser.Scene {
     const absorbed = skillShieldAbsorb + shieldAbsorb;
     if (absorbed > 0 && this.relicState.shieldAbsorbHeal > 0) {
       const healed = this.healPlayer(this.relicState.shieldAbsorbHeal);
-      if (healed > 0) this.log(`静盾回流回复 ${healed} HP。`);
+      if (healed > 0) this.log(`静盾回流回复 ${healed} 生命。`);
     }
     const skillShieldText = skillShieldAbsorb > 0 ? `L 护盾吸收 ${skillShieldAbsorb} 点，剩余 ${this.shieldRemaining}/${SHIELD_CAPACITY}。` : '';
     const relicShieldText = shieldAbsorb > 0 ? `临时护盾吸收 ${shieldAbsorb} 点。` : '';
@@ -4222,7 +4222,7 @@ export class DungeonScene extends Phaser.Scene {
   public healPlayer(amount: number) {
     const healed = Math.max(0, Math.min(amount, this.player.stats.maxHp - this.player.stats.hp));
     this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
-    if (healed > 0) this.showFloatingText(this.player.x, this.player.y - 42, `+${healed} HP`, '#8ffcff');
+    if (healed > 0) this.showFloatingText(this.player.x, this.player.y - 42, `+${healed} 生命`, '#8ffcff');
     return healed;
   }
 
@@ -4307,7 +4307,7 @@ export class DungeonScene extends Phaser.Scene {
     this.showFloatingText(this.player.x, this.player.y - 98, `金币 +${gold}`, '#ffe6ad');
     if (this.relicState.roomClearHeal > 0) {
       const healed = this.healPlayer(this.relicState.roomClearHeal);
-      if (healed > 0) this.log(`战斗清理后回复 ${healed} HP。`);
+      if (healed > 0) this.log(`战斗清理后回复 ${healed} 生命。`);
     }
   }
 
@@ -4671,7 +4671,7 @@ export class DungeonScene extends Phaser.Scene {
       const healAmount = 25 + lowHpBonus + this.relicState.potionHealBonus;
       this.healPlayer(healAmount);
       this.currentRoom.rewardClaimed = true;
-      this.showRewardToast('potion_hp', `获得：小型生命药水 HP +${healAmount}`);
+      this.showRewardToast('potion_hp', `获得：小型生命药水 生命 +${healAmount}`);
       this.log(`获得小型生命药水：回复 ${healAmount} 点生命。按 E 继续。`);
       return;
     }
