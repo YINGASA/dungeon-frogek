@@ -4709,29 +4709,29 @@ export class DungeonScene extends Phaser.Scene {
     const dashLeft = Math.max(0, Math.ceil((this.skillCooldowns.dashSlash - time) / 1000));
     const shieldLeft = Math.max(0, Math.ceil((this.skillCooldowns.shield - time) / 1000));
     const shieldActive = this.isSkillShieldActive(time);
-    const shieldStatus = shieldActive ? `${this.shieldRemaining}/${SHIELD_CAPACITY}` : shieldLeft === 0 ? 'Ready' : `CD ${shieldLeft}s`;
+    const shieldStatus = shieldActive ? `${this.shieldRemaining}/${SHIELD_CAPACITY}` : shieldLeft === 0 ? '就绪' : `冷却 ${shieldLeft}s`;
     const hpRatio = Phaser.Math.Clamp(this.player.stats.hp / this.player.stats.maxHp, 0, 1);
     this.hpBarFill.width = 176 * hpRatio;
     this.hpBarFill.setFillStyle(hpRatio < 0.32 ? 0xff5f7d : 0x35e7c4);
     this.updateLowHpWarning(time);
     const recentRelics = this.relicState.relics.slice(-3).map((relic) => this.getRewardDisplayName(relic)).join(' / ') || '无';
     const statuses = [
-      this.poisonRooms > 0 ? `Poison ${this.poisonRooms} room` : '',
-      this.rustRooms > 0 ? `Rust ${this.rustRooms} room` : '',
-      this.roomSpeedMultiplier < 1 ? 'Slow' : ''
-    ].filter(Boolean).join('  ') || 'Clear';
+      this.poisonRooms > 0 ? `中毒 ${this.poisonRooms} 房` : '',
+      this.rustRooms > 0 ? `锈蚀 ${this.rustRooms} 房` : '',
+      this.roomSpeedMultiplier < 1 ? '减速' : ''
+    ].filter(Boolean).join('  ') || '正常';
     this.statusText.setText([
-      `HP ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${shieldActive ? `  L Shield ${this.shieldRemaining}/${SHIELD_CAPACITY}` : ""}${this.relicState.temporaryShield > 0 ? `  Shield ${this.relicState.temporaryShield}` : ""}`,
-      `ATK ${this.player.stats.atk}    DEF ${this.player.stats.def}`,
-      `Gold ${this.gold}    Relics ${this.relicState.relics.length}`,
-      `Weapon ${this.selectedWeapon.name}`,
-      `Status ${statuses}`,
-      `Recent ${recentRelics}`
+      `生命 ${Math.max(0, Math.ceil(this.player.stats.hp))}/${this.player.stats.maxHp}${shieldActive ? `  L 护盾 ${this.shieldRemaining}/${SHIELD_CAPACITY}` : ""}${this.relicState.temporaryShield > 0 ? `  临时护盾 ${this.relicState.temporaryShield}` : ""}`,
+      `攻击 ${this.player.stats.atk}    防御 ${this.player.stats.def}`,
+      `金币 ${this.gold}    遗物 ${this.relicState.relics.length}`,
+      `武器 ${this.selectedWeapon.name}`,
+      `状态 ${statuses}`,
+      `最近 ${recentRelics}`
     ]);
     this.skillText.setText([
-      '[J] Attack',
-      `[K] Dash Slash: ${dashLeft === 0 ? 'Ready' : `CD ${dashLeft}s`}`,
-      `[L] Shield: ${shieldStatus}`,
+      '[J] 普通攻击',
+      `[K] 冲刺斩：${dashLeft === 0 ? '就绪' : `冷却 ${dashLeft}s`}`,
+      `[L] 护盾：${shieldStatus}`,
       '[I] 查看状态',
       '[E] 互动  [Esc] 暂停  [R] 重开'
     ]);
