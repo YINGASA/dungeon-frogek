@@ -81,7 +81,7 @@ export const AnalyticsPage = () => {
       setStatus('分析报告已生成。');
     } catch (error) {
       setReport(null);
-      setStatus(error instanceof Error ? `分析报告生成失败：${error.message}` : '分析报告生成失败。');
+      setStatus('分析报告生成失败。请稍后重试，或先查看上方规则诊断。');
     } finally {
       setIsGenerating(false);
     }
