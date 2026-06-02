@@ -22,9 +22,9 @@ const formatAveragePercent = (runs: GameRun[], key: keyof GameRun) => {
   const values = finiteValues(runs, key).map((value) => clamp(value, 0, 100));
   return values.length ? `${average(values).toFixed(1)}%` : '暂无';
 };
-const formatReportItems = (value: AnalysisReport[keyof AnalysisReport]) => {
-  const items = Array.isArray(value) ? value : [value];
-  return items.map((item) => String(item).trim()).filter(Boolean);
+const formatReportItems = (value: AnalysisReport[keyof AnalysisReport] | null | undefined) => {
+  const items = Array.isArray(value) ? value : value == null ? [] : [value];
+  return items.filter((item) => item != null).map((item) => String(item).trim()).filter(Boolean);
 };
 const reportSections: { key: keyof AnalysisReport; title: string }[] = [
   { key: 'summary', title: '综合摘要' },
