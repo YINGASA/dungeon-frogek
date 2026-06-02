@@ -470,7 +470,7 @@ const DUNGEON_EVENTS: DungeonEventDef[] = [
     description: '一座布满裂纹的祭坛仍在低声共鸣，源晶碎片漂浮在祭坛上方。',
     options: [
       { text: '献祭 15 HP，获得 ATK +3', disabledText: '生命不足', canChoose: (scene) => scene.player.stats.hp > 15, apply: (scene) => { scene.player.stats.hp -= 15; scene.player.stats.atk += 3; return '献祭生命，ATK +3。'; } },
-      { text: '献祭 20 金币，获得随机 rare 奖励', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 20, apply: (scene) => { scene.gold -= 20; const reward = scene.pickRewardByRarity('rare', []); if (reward) scene.grantReward(reward); return reward ? `献祭金币，获得 ${scene.getRewardDisplayName(reward)}。` : '祭坛沉默了。'; } },
+      { text: '献祭 20 金币，获得随机稀有奖励', disabledText: '金币不足', canChoose: (scene) => scene.gold >= 20, apply: (scene) => { scene.gold -= 20; const reward = scene.pickRewardByRarity('rare', []); if (reward) scene.grantReward(reward); return reward ? `献祭金币，获得 ${scene.getRewardDisplayName(reward)}。` : '祭坛沉默了。'; } },
       { text: '离开，无事发生', canChoose: () => true, apply: () => '你离开了古老祭坛。' }
     ]
   },
@@ -719,7 +719,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 12 点伤害，并获得 1 个 common 或 rare 奖励；rare 概率较低。',
+    effectText: '受到 12 点伤害，并获得 1 个普通或稀有奖励；稀有概率较低。',
     followUpObjective: '封印吞下血迹后，通道会重新显现。',
     roomTags: ['event'],
     minRoomIndex: 2,
@@ -854,7 +854,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 2,
     effectType: 'elite-patrol',
-    effectText: '生成 1 个精英怪和 1 个普通怪；清完后给少量金币，低概率给 rare 奖励。',
+    effectText: '生成 1 个精英怪和 1 个普通怪；清完后给少量金币，低概率给稀有奖励。',
     followUpObjective: '击败精英巡逻队。',
     roomTags: ['event'],
     minRoomIndex: 3,
@@ -876,7 +876,7 @@ const EVENT_PACK: EventPackDef[] = [
     rarity: 'rare',
     weight: 4,
     effectType: 'unstable-crystal',
-    effectText: '受到 12 点伤害，并获得随机 common 或 rare 奖励；rare 概率较低。',
+    effectText: '受到 12 点伤害，并获得随机普通或稀有奖励；稀有概率较低。',
     followUpObjective: '吸收残余能量后继续前进。',
     roomTags: ['event'],
     applyEffect: (scene) => {
