@@ -47,7 +47,9 @@ export const AnalyticsPage = () => {
   const level = useMemo(() => storageService.getLevel(), []);
   const hasRuns = runs.length > 0;
   const wins = runs.filter(isVictoryRun);
-  const winRate = runs.length ? wins.length / runs.length : 0;
+  const resolvedRuns = runs.filter((run) => isVictoryRun(run) || isFailedRun(run));
+  const winRate = resolvedRuns.length ? wins.length / resolvedRuns.length : 0;
+  const winRateLabel = resolvedRuns.length ? pct(winRate) : '暂无';
   const bossRemainingValues = finiteValues(runs, 'bossRemainingHpPercent').map((value) => clamp(value, 0, 100));
   const bossRemainingAverage = bossRemainingValues.length ? average(bossRemainingValues) : 0;
   const durationValues = finiteValues(runs, 'durationSeconds');
@@ -61,11 +63,13 @@ export const AnalyticsPage = () => {
   const commonFailureReason = Object.entries(failureReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '暂无失败记录';
   const roleRates = Array.from(new Set(runs.map(getRunRoleName))).map((name) => {
     const list = runs.filter((run) => getRunRoleName(run) === name);
-    return `${name}: ${pct(list.filter(isVictoryRun).length / list.length)}`;
+    const resolvedList = list.filter((run) => isVictoryRun(run) || isFailedRun(run));
+    const label = resolvedList.length ? pct(list.filter(isVictoryRun).length / resolvedList.length) : '暂无';
+    return `${name}: ${label}`;
   }).join(' / ');
   const rules = hasRuns ? [
-    winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
-    winRate > 0.8 && '通关率高于 80%，难度不足。',
+    resolvedRuns.length > 0 && winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
+    resolvedRuns.length > 0 && winRate > 0.8 && '通关率高于 80%，难度不足。',
     bossRemainingValues.length > 0 && bossRemainingAverage > 50 && '首领平均剩余血量高于 50%，首领过强。',
     durationValues.length > 0 && average(durationValues) < level.durationMinutes * 60 * 0.5 && '平均游戏时长低于目标时长 50%，关卡过短。',
     eventValues.length > 0 && average(eventValues) < 0.5 && '事件触发率低，地图路径设计不足。',
@@ -95,7 +99,7 @@ export const AnalyticsPage = () => {
       <section className="stats-row">
         <StatCard label="总试玩次数" value={runs.length} />
         <StatCard label="通关次数" value={wins.length} />
-        <StatCard label="通关率" value={pct(winRate)} />
+        <StatCard label="通关率" value={winRateLabel} />
         <StatCard label="平均时长" value={formatAverage(runs, 'durationSeconds', (value) => `${(value / 60).toFixed(1)}m`)} />
         <StatCard label="平均击杀" value={formatAverage(runs, 'kills')} />
         <StatCard label="平均金币" value={formatAverage(runs, 'goldEarned')} />
