@@ -60,7 +60,7 @@ export const storageService = {
     return Array.isArray(runs) ? runs.filter(isStoredRun) : [];
   },
   saveRun(run: GameRun) {
-    const runs = [run, ...this.getRuns()].slice(0, 100);
+    const runs = [run, ...this.getRuns().filter((storedRun) => storedRun.id !== run.id)].slice(0, 100);
     write(keys.runs, runs);
     write(keys.lastRun, run);
   },
