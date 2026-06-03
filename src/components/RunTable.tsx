@@ -39,8 +39,8 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
             <td colSpan={8}>暂无对局记录。完成一次试玩结算后会显示最近 10 局。</td>
           </tr>
         )}
-        {runs.slice(0, 10).map((run) => (
-          <tr key={run.id}>
+        {runs.slice(0, 10).map((run, index) => (
+          <tr key={`${run.id}-${index}`}>
             <td>{getRunResultLabel(run)}</td>
             <td>{getRunRoleName(run)}</td>
             <td>{formatDuration(run.durationSeconds)}</td>
