@@ -7,6 +7,7 @@ const keys = {
   assets: 'adf:assetManifest',
   lastRun: 'adf:lastRun'
 };
+const maxStoredRuns = 100;
 
 const read = <T>(key: string, fallback: T): T => {
   try {
@@ -57,10 +58,10 @@ export const storageService = {
   },
   getRuns(): GameRun[] {
     const runs = read<unknown>(keys.runs, []);
-    return Array.isArray(runs) ? runs.filter(isStoredRun).slice(0, 100) : [];
+    return Array.isArray(runs) ? runs.filter(isStoredRun).slice(0, maxStoredRuns) : [];
   },
   saveRun(run: GameRun) {
-    const runs = [run, ...this.getRuns().filter((storedRun) => storedRun.id !== run.id)].slice(0, 100);
+    const runs = [run, ...this.getRuns().filter((storedRun) => storedRun.id !== run.id)].slice(0, maxStoredRuns);
     write(keys.runs, runs);
     write(keys.lastRun, run);
   },
