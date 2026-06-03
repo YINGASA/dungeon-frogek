@@ -2,10 +2,11 @@ import { GameRun } from '../types/game';
 import { getRunResultLabel, getRunRoleName } from '../services/runDisplayService';
 
 const toFiniteNumber = (value: unknown, fallback = 0) => {
+  if (typeof value === 'string' && value.trim() === '') return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
-const isFiniteNumber = (value: unknown) => Number.isFinite(Number(value));
+const isFiniteNumber = (value: unknown) => !(typeof value === 'string' && value.trim() === '') && Number.isFinite(Number(value));
 const formatNumber = (value: unknown) => (isFiniteNumber(value) ? Number(value) : '暂无');
 const formatPercent = (value: unknown) => {
   if (!isFiniteNumber(value)) return '暂无';

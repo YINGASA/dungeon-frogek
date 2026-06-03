@@ -8,6 +8,7 @@ import { AnalysisReport, GameRun } from '../types/game';
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const toFiniteNumber = (value: unknown, fallback = 0) => {
+  if (typeof value === 'string' && value.trim() === '') return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
