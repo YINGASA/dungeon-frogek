@@ -57,7 +57,7 @@ export const storageService = {
   },
   getRuns(): GameRun[] {
     const runs = read<unknown>(keys.runs, []);
-    return Array.isArray(runs) ? runs.filter(isStoredRun) : [];
+    return Array.isArray(runs) ? runs.filter(isStoredRun).slice(0, 100) : [];
   },
   saveRun(run: GameRun) {
     const runs = [run, ...this.getRuns().filter((storedRun) => storedRun.id !== run.id)].slice(0, 100);
