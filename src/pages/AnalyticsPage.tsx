@@ -69,6 +69,7 @@ export const AnalyticsPage = () => {
     return `${name}: ${label}`;
   }).join(' / ');
   const rules = hasRuns ? [
+    resolvedRuns.length === 0 && '暂无已判定胜负的对局，通关率与体验评分暂不计算。',
     resolvedRuns.length > 0 && winRate < 0.3 && '通关率低于 30%，怪物过强或补给不足。',
     resolvedRuns.length > 0 && winRate > 0.8 && '通关率高于 80%，难度不足。',
     bossRemainingValues.length > 0 && bossRemainingAverage > 50 && '首领平均剩余血量高于 50%，首领过强。',
