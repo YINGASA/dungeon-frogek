@@ -1,5 +1,5 @@
 import { GameRun } from '../types/game';
-import { getRunRoleName, isVictoryRun } from '../services/runDisplayService';
+import { getRunResultLabel, getRunRoleName } from '../services/runDisplayService';
 
 const toFiniteNumber = (value: unknown, fallback = 0) => {
   const numeric = Number(value);
@@ -40,7 +40,7 @@ export const RunTable = ({ runs }: { runs: GameRun[] }) => (
         )}
         {runs.slice(0, 10).map((run) => (
           <tr key={run.id}>
-            <td>{isVictoryRun(run) ? '胜利' : '失败'}</td>
+            <td>{getRunResultLabel(run)}</td>
             <td>{getRunRoleName(run)}</td>
             <td>{formatDuration(run.durationSeconds)}</td>
             <td>{formatNumber(run.kills)}</td>

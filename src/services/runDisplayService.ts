@@ -44,4 +44,10 @@ export const getFailureReason = (run: GameRun) => {
   return reason && !victoryReasonPattern.test(reason) ? reason : '未知失败原因';
 };
 
+export const getRunResultLabel = (run: GameRun) => {
+  if (isVictoryRun(run)) return '胜利';
+  if (isFailedRun(run)) return '失败';
+  return '未知';
+};
+
 export const getRunRoleName = (run: GameRun) => cleanLabel(run.heroName || run.className, '未知角色');
