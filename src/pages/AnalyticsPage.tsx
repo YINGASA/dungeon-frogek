@@ -54,7 +54,7 @@ export const AnalyticsPage = () => {
   const bossRemainingAverage = bossRemainingValues.length ? average(bossRemainingValues) : 0;
   const durationValues = finiteValues(runs, 'durationSeconds');
   const eventValues = finiteValues(runs, 'eventsTriggered');
-  const experienceScore = hasRuns ? clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100) : '暂无';
+  const experienceScore = resolvedRuns.length ? clamp(Math.round(70 + winRate * 15 - Math.max(0, bossRemainingAverage - 35) / 3), 0, 100) : '暂无';
   const failureRuns = runs.filter(isFailedRun);
   const failureReasons = failureRuns.reduce<Record<string, number>>((map, run) => {
     const reason = getFailureReason(run);
