@@ -1107,10 +1107,10 @@ export class DungeonScene extends Phaser.Scene {
       this.load.image(`dungeon-${name}-svg`, `/assets/generated/dungeon/${name}.svg`);
     });
     HUNTER_DIRECTIONS.forEach((direction) => {
-      this.load.image(`hunter-${direction}-png`, `/assets/generated/characters/hunter/hunter_${direction}.png`);
+      this.load.image(`hunter-${direction}-png`, `/assets/game/characters/relic_hunter/sprites/relic_hunter_${direction}_idle.png`);
       this.load.image(`hunter-${direction}-svg`, `/assets/generated/characters/hunter/hunter_${direction}.svg`);
       HUNTER_FRAMES.forEach((frame) => {
-        this.load.image(`hunter-${direction}-${frame}-png`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.png`);
+        this.load.image(`hunter-${direction}-${frame}-png`, `/assets/game/characters/relic_hunter/sprites/relic_hunter_${direction}_walk_${frame}.png`);
         this.load.image(`hunter-${direction}-${frame}-svg`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.svg`);
       });
     });
