@@ -13,9 +13,11 @@ export const HomePage = ({ onNavigate }: { onNavigate: (tab: TabId) => void }) =
           <button onClick={() => onNavigate('game')}><Gamepad2 size={18} />开始试玩</button>
         </div>
       </div>
-      <div className="hero-board">
-        <div className="dungeon-grid">
-          {Array.from({ length: 80 }).map((_, index) => <span key={index} className={index % 13 === 0 ? 'danger' : index % 9 === 0 ? 'gold' : index % 7 === 0 ? 'cyan' : ''} />)}
+      <div className="hero-board hero-showcase">
+        <img src="/assets/game/characters/relic_hunter/ui/relic_hunter_home_showcase.png" alt="遗迹猎人主角展示" />
+        <div className="hero-showcase-label">
+          <strong>遗迹猎人</strong>
+          <span>RUINS HUNTER</span>
         </div>
       </div>
     </section>

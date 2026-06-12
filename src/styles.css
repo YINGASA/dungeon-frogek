@@ -49,14 +49,21 @@ main { padding: 26px; max-width: 1440px; margin: 0 auto; }
   min-height: 420px;
   border: 1px solid #27425f;
   background: #0c1424;
-  padding: 16px;
   border-radius: 8px;
+  overflow: hidden;
+  position: relative;
 }
-.dungeon-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; height: 100%; }
-.dungeon-grid span { background: #13233a; border: 1px solid #243b58; border-radius: 4px; }
-.dungeon-grid span.cyan { background: #1b5a62; border-color: #3ee7c9; }
-.dungeon-grid span.gold { background: #5a421b; border-color: #ffb84d; }
-.dungeon-grid span.danger { background: #5c1831; border-color: #ff4f8b; }
+.hero-showcase::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 52%, rgba(4, 9, 17, .92) 100%);
+  pointer-events: none;
+}
+.hero-showcase img { width: 100%; height: 420px; display: block; object-fit: cover; object-position: center 28%; }
+.hero-showcase-label { position: absolute; left: 22px; bottom: 18px; z-index: 1; display: grid; gap: 3px; }
+.hero-showcase-label strong { font-size: 22px; color: #ffffff; }
+.hero-showcase-label span { color: #7df5e4; font-size: 11px; }
 .button-row, .toolbar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .toolbar-row { justify-content: space-between; }
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 18px 0; }
@@ -137,5 +144,6 @@ th { color: #7df5e4; font-size: 13px; }
 @media (max-width: 900px) {
   .topbar, .hero, .page-grid { grid-template-columns: 1fr; display: grid; }
   .tabs { justify-content: flex-start; }
-  .hero-board { min-height: 300px; }
+  .hero-board { min-height: 340px; }
+  .hero-showcase img { height: 340px; object-position: center 24%; }
 }
