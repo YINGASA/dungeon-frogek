@@ -30,10 +30,13 @@ export const GamePage = () => {
       <aside className="panel sidebar">
         <h2>灵墟地牢</h2>
         <p>你是遗迹猎人，进入地下遗迹“灵墟”，寻找被污染的源晶。当前版本支持 6-8 房间随机路线、分支传送门、奖励三选一、遗物成长和 Boss 战闭环。</p>
-        <div className="control-card">
-          <strong>角色</strong>
-          <span>遗迹猎人</span>
-          <span>生命 120 / 攻击 14 / 防御 4</span>
+        <div className="control-card character-card">
+          <img src="/assets/game/characters/relic_hunter/ui/relic_hunter_avatar.png" alt="遗迹猎人头像" />
+          <div className="character-card-copy">
+            <strong>角色</strong>
+            <span>遗迹猎人</span>
+            <span>生命 120 / 攻击 14 / 防御 4</span>
+          </div>
         </div>
         <div className="control-card">
           <strong>操作</strong>
