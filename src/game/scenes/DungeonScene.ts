@@ -4485,9 +4485,13 @@ export class DungeonScene extends Phaser.Scene {
     this.selectedHero = DEFAULT_HERO;
 
     this.weaponPanel = this.add.container(480, 300).setDepth(225);
-    this.weaponPanel.add(this.add.rectangle(0, 0, 820, 500, 0x07101e, 0.97).setStrokeStyle(2, 0x35e7c4, 0.95));
-    this.weaponPanel.add(this.add.text(0, -220, '选择初始武器', { fontFamily: 'monospace', fontSize: '32px', color: '#ffffff' }).setOrigin(0.5));
-    this.weaponPanel.add(this.add.text(0, -188, `当前角色：${this.selectedHero.name}。本局武器固定，按 1 / 2 / 3 / 4 或点击卡牌选择。`, { fontFamily: 'monospace', fontSize: '15px', color: '#8ffcff' }).setOrigin(0.5));
+    this.weaponPanel.add(this.add.rectangle(0, 0, 836, 516, 0x020711, 0.78).setStrokeStyle(1, 0x102c42, 0.92));
+    this.weaponPanel.add(this.add.rectangle(0, 0, 820, 500, 0x07101e, 0.98).setStrokeStyle(2, 0x35e7c4, 0.95));
+    this.weaponPanel.add(this.add.rectangle(0, -204, 780, 72, 0x0b1a2d, 0.94).setStrokeStyle(1, 0x2d5f78, 0.9));
+    this.weaponPanel.add(this.add.rectangle(0, -246, 180, 4, 0x35e7c4, 0.95));
+    this.weaponPanel.add(this.add.text(0, -224, '选择初始武器', { fontFamily: 'monospace', fontSize: '30px', color: '#ffffff' }).setOrigin(0.5));
+    this.weaponPanel.add(this.add.text(0, -190, `当前角色：${this.selectedHero.name}。本局武器固定，按 1 / 2 / 3 / 4 或点击卡牌选择。`, { fontFamily: 'monospace', fontSize: '14px', color: '#8ffcff' }).setOrigin(0.5));
+    this.weaponPanel.add(this.add.text(0, 226, '源晶共鸣将在选择后锁定', { fontFamily: 'monospace', fontSize: '11px', color: '#668aa1', letterSpacing: 2 }).setOrigin(0.5));
     this.getCurrentHeroWeapons().forEach((weapon, index) => {
       this.weaponPanel?.add(this.createWeaponCard(weapon, index));
     });
@@ -4501,14 +4505,26 @@ export class DungeonScene extends Phaser.Scene {
 
   private createWeaponCard(weapon: WeaponConfig, index: number) {
     const x = -300 + index * 200;
-    const card = this.add.container(x, 28);
-    const rect = this.add.rectangle(0, 0, 176, 330, 0x0b1628, 0.96).setStrokeStyle(2, weapon.attackColor, 0.92).setInteractive({ useHandCursor: true });
-    rect.on('pointerover', () => rect.setFillStyle(0x10233a, 0.98));
-    rect.on('pointerout', () => rect.setFillStyle(0x0b1628, 0.96));
+    const card = this.add.container(x, 24);
+    const shadow = this.add.rectangle(4, 6, 176, 330, 0x000000, 0.34);
+    const rect = this.add.rectangle(0, 0, 176, 330, 0x0b1628, 0.98).setStrokeStyle(2, 0x2d5f78, 0.96).setInteractive({ useHandCursor: true });
+    const accent = this.add.rectangle(0, -162, 148, 4, weapon.attackColor, 0.92);
+    rect.on('pointerover', () => {
+      rect.setFillStyle(0x102841, 1).setStrokeStyle(3, 0x35e7c4, 1);
+      accent.setFillStyle(0x8ffcff, 1);
+      card.setY(18);
+    });
+    rect.on('pointerout', () => {
+      rect.setFillStyle(0x0b1628, 0.98).setStrokeStyle(2, 0x2d5f78, 0.96);
+      accent.setFillStyle(weapon.attackColor, 0.92);
+      card.setY(24);
+    });
     rect.on('pointerdown', () => this.chooseWeapon(index));
-    card.add(rect);
-    card.add(this.add.text(-76, -146, `${index + 1}`, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }));
+    card.add([shadow, rect, accent]);
+    card.add(this.add.circle(-70, -140, 15, 0x07101e, 1).setStrokeStyle(2, weapon.attackColor, 0.95));
+    card.add(this.add.text(-70, -140, `${index + 1}`, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }).setOrigin(0.5));
     card.add(this.add.text(0, -128, weapon.name, { fontFamily: 'monospace', fontSize: '24px', color: '#ffffff' }).setOrigin(0.5));
+    card.add(this.add.circle(46, -116, 30, 0x06101a, 0.9).setStrokeStyle(1, weapon.attackColor, 0.48));
     card.add(this.createWeaponCardPreview(weapon));
     card.add(this.add.text(0, -98, weapon.role, { fontFamily: 'monospace', fontSize: '14px', color: '#8ffcff' }).setOrigin(0.5));
     card.add(this.add.text(-70, -70, weapon.description, { fontFamily: 'monospace', fontSize: '11px', color: '#dff7ff', wordWrap: { width: 140, useAdvancedWrap: true }, lineSpacing: 2 }));
