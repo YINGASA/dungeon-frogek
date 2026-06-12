@@ -87,6 +87,16 @@ main { padding: 26px; max-width: 1440px; margin: 0 auto; }
 .class-list button { width: 100%; justify-content: space-between; align-items: flex-start; flex-direction: column; }
 .class-list span, .control-card span { color: #b9d1e7; font-size: 13px; }
 .control-card { display: grid; gap: 8px; padding: 14px; border: 1px solid #2c4968; border-radius: 8px; background: #0a1322; }
+.character-card { grid-template-columns: 72px minmax(0, 1fr); align-items: center; column-gap: 10px; }
+.character-card img {
+  width: 72px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #41698d;
+  border-radius: 50%;
+  background: #08111f;
+}
+.character-card-copy { display: grid; gap: 7px; min-width: 0; }
 .game-panel { min-height: 660px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .game-host { width: 100%; min-height: 620px; display: flex; align-items: center; justify-content: center; }
 .empty-state { padding: 40px; color: #9ebad3; text-align: center; border: 1px dashed #2d4867; border-radius: 8px; width: 100%; }
