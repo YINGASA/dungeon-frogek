@@ -902,7 +902,7 @@ const DUNGEON_ASSETS = [
 
 type DungeonAssetName = (typeof DUNGEON_ASSETS)[number];
 const HUNTER_DIRECTIONS = ['down', 'up', 'left', 'right'] as const;
-const HUNTER_FRAMES = ['1', '2'] as const;
+const HUNTER_FRAMES = ['1', '2', '3', '4'] as const;
 const HUNTER_DISPLAY_SIZE = 51;
 type HunterDirection = (typeof HUNTER_DIRECTIONS)[number];
 type HunterFrame = 'idle' | (typeof HUNTER_FRAMES)[number];
@@ -1111,7 +1111,9 @@ export class DungeonScene extends Phaser.Scene {
       this.load.image(`hunter-${direction}-svg`, `/assets/generated/characters/hunter/hunter_${direction}.svg`);
       HUNTER_FRAMES.forEach((frame) => {
         this.load.image(`hunter-${direction}-${frame}-png`, `/assets/game/characters/relic_hunter/sprites/relic_hunter_${direction}_walk_${frame}.png`);
-        this.load.image(`hunter-${direction}-${frame}-svg`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.svg`);
+        if (frame === '1' || frame === '2') {
+          this.load.image(`hunter-${direction}-${frame}-svg`, `/assets/generated/characters/hunter/hunter_${direction}_${frame}.svg`);
+        }
       });
     });
     SLIME_FRAMES.forEach((frame) => {
@@ -2818,8 +2820,9 @@ export class DungeonScene extends Phaser.Scene {
     let frame: HunterFrame = 'idle';
     if (moving) {
       if (time >= this.nextWalkFrameAt) {
-        this.playerWalkFrame = this.playerWalkFrame === '1' ? '2' : '1';
-        this.nextWalkFrameAt = time + 160;
+        const currentFrameIndex = this.playerWalkFrame === 'idle' ? -1 : HUNTER_FRAMES.indexOf(this.playerWalkFrame);
+        this.playerWalkFrame = HUNTER_FRAMES[(currentFrameIndex + 1) % HUNTER_FRAMES.length];
+        this.nextWalkFrameAt = time + 120;
       }
       frame = this.playerWalkFrame === 'idle' ? '1' : this.playerWalkFrame;
     } else {
